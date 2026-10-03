@@ -3,8 +3,11 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from typing import List, Dict, Any, Optional
 import re
+import json
+import httpx
 from datetime import datetime
 
+from app.core.config import settings
 from app.core.database import get_db
 from app.models.entities import (
     Fornecedor,
@@ -205,8 +208,87 @@ def list_materiais(db: Session = Depends(get_db)):
 def analisar_etiqueta_ocr(payload: OCRAnaliseRequest, db: Session = Depends(get_db)):
     """
     Motor assistido de análise OCR para etiquetas de gôndola e embalagens de construção.
-    Extrai parâmetros técnicos, conversores de embalagem e preços à vista/prazo.
+    Extrai parâmetros técnicos, conversores de embalagem e preços à vista/prazo via Gemini Vision ou Regex local.
     """
+    # 0. Se houver chave Gemini configurada e imagem da etiqueta em Base64:
+    if settings.GEMINI_API_KEY and payload.imagem_base64 and len(payload.imagem_base64) > 100:
+        try:
+            raw_base64 = payload.imagem_base64
+            mime_type = "image/jpeg"
+            if "," in raw_base64:
+                header, raw_base64 = raw_base64.split(",", 1)
+                if "png" in header:
+                    mime_type = "image/png"
+                elif "webp" in header:
+                    mime_type = "image/webp"
+
+            prompt_instrucao = (
+                "Você é um especialista em suprimentos de construção civil e leitura de etiquetas de gôndola e embalagens "
+                "de materiais (como Telhanorte, Leroy Merlin, depósitos de bairro). "
+                "Analise cuidadosamente a imagem da etiqueta e retorne ESTRITAMENTE um objeto JSON válido (sem tags markdown): "
+                "{\n"
+                '  "descricao": "Nome comercial completo e nítido do produto (ex: Porcelanato Retificado Bianco 60x60)",\n'
+                '  "fabricante": "Marca/Fabricante detectado (ex: Portobello, Celite, Tigre, Votoran, Deca, Coral, etc)",\n'
+                '  "modelo_sku": "Código de barras, referência ou SKU impresso na etiqueta",\n'
+                '  "preco_vista": 0.00 (Número float com o preço à vista/Pix/dinheiro),\n'
+                '  "preco_prazo": 0.00 (Número float com o preço parcelado se houver, ou null),\n'
+                '  "unidade_venda": "unidade comercial (ex: cx, m², un, saco, lata)",\n'
+                '  "fator_embalagem": 1.0 (Metragem por caixa em m², ou kg por saco, ou litros por lata. Se unitário, 1.0)\n'
+                "}"
+            )
+
+            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+            req_body = {
+                "contents": [
+                    {
+                        "parts": [
+                            {"text": prompt_instrucao},
+                            {
+                                "inline_data": {
+                                    "mime_type": mime_type,
+                                    "data": raw_base64.strip()
+                                }
+                            }
+                        ]
+                    }
+                ],
+                "generationConfig": {
+                    "response_mime_type": "application/json"
+                }
+            }
+
+            resp = httpx.post(gemini_url, json=req_body, timeout=25.0)
+            if resp.status_code == 200:
+                resp_data = resp.json()
+                texto_gemini = resp_data["candidates"][0]["content"]["parts"][0]["text"]
+                dados_ia = json.loads(texto_gemini)
+
+                # Busca categoria correspondente na base
+                todas_categorias = db.query(Categoria).all()
+                categoria_sugerida_id = None
+                desc_upper = (dados_ia.get("descricao") or "").upper()
+                for cat in todas_categorias:
+                    tipo_words = cat.tipo.upper().split()
+                    if any(w in desc_upper for w in tipo_words if len(w) > 3):
+                        categoria_sugerida_id = cat.id
+                        break
+
+                return OCRAnaliseResponse(
+                    descricao=dados_ia.get("descricao", "Material Identificado via IA"),
+                    fabricante=dados_ia.get("fabricante"),
+                    modelo_sku=str(dados_ia.get("modelo_sku") or ""),
+                    unidade_venda=dados_ia.get("unidade_venda", "un"),
+                    fator_embalagem=float(dados_ia.get("fator_embalagem") or 1.0),
+                    preco_vista=float(dados_ia.get("preco_vista") or 0.0),
+                    preco_prazo=float(dados_ia.get("preco_prazo")) if dados_ia.get("preco_prazo") else None,
+                    categoria_sugerida_id=categoria_sugerida_id,
+                    confianca_ocr=0.98,
+                    observacoes="Leitura realizada com inteligência artificial multimodal (Gemini Vision 1.5 Flash)"
+                )
+        except Exception as e:
+            # Em caso de falha de conexão com a API externa, segue para o motor local
+            pass
+
     texto = (payload.texto_bruto or "").strip()
     loja = payload.loja_sugerida or ""
 

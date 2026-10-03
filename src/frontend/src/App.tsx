@@ -290,18 +290,91 @@ export function App() {
     executarAnaliseOCR(exemplo.texto, exemplo.imagem);
   };
 
-  // Upload ou Câmera do Celular
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Compressão inteligente de imagem em Canvas (reduz de 15MB para ~120KB)
+  const redimensionarFoto = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const MAX_WIDTH = 1200;
+          let width = img.width;
+          let height = img.height;
+
+          if (width > MAX_WIDTH) {
+            height = Math.round((height * MAX_WIDTH) / width);
+            width = MAX_WIDTH;
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            resolve(e.target?.result as string);
+            return;
+          }
+          ctx.drawImage(img, 0, 0, width, height);
+          const compressed = canvas.toDataURL('image/jpeg', 0.82);
+          resolve(compressed);
+        };
+        img.onerror = () => resolve(e.target?.result as string);
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => resolve('');
+      reader.readAsDataURL(file);
+    });
+  };
+
+  // Upload ou Câmera do Celular (Com suporte a Modo Disparo Rápido / Zero Digitação)
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64 = reader.result as string;
-        setPreviewImage(base64);
-        // Simular leitura OCR do arquivo carregado
-        executarAnaliseOCR(`ETIQUETA FOTO ${file.name.toUpperCase()} R$ 68,90 COD ${Math.floor(10000 + Math.random() * 90000)} CX 2.14 M2`, base64);
-      };
-      reader.readAsDataURL(file);
+      try {
+        setIsAnalyzing(true);
+        const compressedBase64 = await redimensionarFoto(file);
+        setPreviewImage(compressedBase64);
+
+        if (apiOnline) {
+          // Se estiver com conexão: aciona análise OCR/IA imediatamente
+          await executarAnaliseOCR('', compressedBase64);
+        } else {
+          // Se estiver no MODO AVIÃO / OFFLINE no depósito:
+          // Salva a foto na fila local do celular instantaneamente (Zero Digitação)!
+          const itemOffline: OfflineCaptura = {
+            id: 'off_' + Date.now(),
+            fornecedor_id: Number(selectedFornecedorId),
+            fornecedor_nome: fornecedores.find(f => f.id === Number(selectedFornecedorId))?.nome || 'Loja',
+            descricao: `Etiqueta fotografada às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+            fabricante: null,
+            modelo_sku: null,
+            categoria_id: null,
+            unidade_venda: 'un',
+            fator_embalagem: 1.0,
+            preco_vista: 0.0,
+            preco_prazo: null,
+            foto_etiqueta_url: compressedBase64,
+            timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+          };
+
+          const novaFila = [itemOffline, ...offlineQueue];
+          setOfflineQueue(novaFila);
+          try {
+            localStorage.setItem('obras_offline_queue', JSON.stringify(novaFila));
+          } catch (storageErr) {
+            console.error('Falha de armazenamento local:', storageErr);
+          }
+
+          setSaveMessage({
+            tipo: 'sucesso',
+            texto: '📸 Foto da etiqueta salva no celular! (Modo Disparo Rápido — Zero Digitação). Quando conectar ao Wi-Fi, a IA extrairá todos os dados.'
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao processar imagem:', err);
+      } finally {
+        setIsAnalyzing(false);
+      }
     }
   };
 
@@ -394,10 +467,45 @@ export function App() {
       setIsSyncing(true);
       setSaveMessage(null);
 
+      // Processar itens da fila: se for foto rápida (sem preço digitado), passa pela IA Gemini
+      const itensProntos = [];
+      for (const item of offlineQueue) {
+        let itemFinal = { ...item };
+        if (item.foto_etiqueta_url && (!item.preco_vista || item.preco_vista === 0)) {
+          try {
+            const aiRes = await fetch(`${API_URL}/api/v1/captura/analisar`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                imagem_base64: item.foto_etiqueta_url,
+                loja_sugerida: item.fornecedor_nome
+              })
+            });
+            if (aiRes.ok) {
+              const aiData = await aiRes.json();
+              itemFinal = {
+                ...itemFinal,
+                descricao: aiData.descricao || itemFinal.descricao,
+                fabricante: aiData.fabricante || itemFinal.fabricante,
+                modelo_sku: aiData.modelo_sku || itemFinal.modelo_sku,
+                categoria_id: aiData.categoria_sugerida_id || itemFinal.categoria_id,
+                unidade_venda: aiData.unidade_venda || itemFinal.unidade_venda,
+                fator_embalagem: aiData.fator_embalagem || itemFinal.fator_embalagem,
+                preco_vista: aiData.preco_vista || itemFinal.preco_vista,
+                preco_prazo: aiData.preco_prazo || itemFinal.preco_prazo
+              };
+            }
+          } catch {
+            // Continua com os dados existentes
+          }
+        }
+        itensProntos.push(itemFinal);
+      }
+
       const res = await fetch(`${API_URL}/api/v1/captura/sincronizar-lote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(offlineQueue)
+        body: JSON.stringify(itensProntos)
       });
 
       if (res.ok) {
@@ -406,7 +514,7 @@ export function App() {
         localStorage.removeItem('obras_offline_queue');
         setSaveMessage({
           tipo: 'sucesso',
-          texto: `🎉 Sincronização concluída! ${data.total_salvos} itens descarregados no banco de dados local com sucesso!`
+          texto: `🎉 Sincronização concluída! ${data.total_salvos} itens analisados pela IA e gravados no banco de dados local com sucesso!`
         });
         fetchData();
       } else {
@@ -676,13 +784,26 @@ export function App() {
                       whiteSpace: 'nowrap',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '0.4rem',
+                      gap: '0.5rem',
                       border: '1px solid var(--border-subtle)'
                     }}
                   >
+                    {item.foto_etiqueta_url && (
+                      <img
+                        src={item.foto_etiqueta_url}
+                        alt="Etiqueta"
+                        style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }}
+                      />
+                    )}
                     <span style={{ color: 'var(--amber-primary)', fontWeight: 600 }}>[{item.fornecedor_nome}]</span>
                     <span style={{ color: '#fff' }}>{item.descricao}</span>
-                    <span style={{ color: 'var(--emerald-success)', fontWeight: 700 }}>{formatCurrency(item.preco_vista)}</span>
+                    {item.preco_vista > 0 ? (
+                      <span style={{ color: 'var(--emerald-success)', fontWeight: 700 }}>{formatCurrency(item.preco_vista)}</span>
+                    ) : (
+                      <span style={{ color: 'var(--amber-primary)', fontSize: '0.7rem', background: 'rgba(245, 158, 11, 0.15)', padding: '0.15rem 0.4rem', borderRadius: '4px' }}>
+                        🤖 Aguardando IA
+                      </span>
+                    )}
                   </div>
                 ))}
               </div>

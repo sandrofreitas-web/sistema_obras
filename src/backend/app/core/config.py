@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # Environment
     ENVIRONMENT: str = "development"
     LOG_LEVEL: str = "info"
+    GEMINI_API_KEY: Optional[str] = None
     
     class Config:
         env_file = ".env"
