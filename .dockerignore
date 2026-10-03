@@ -1,0 +1,36 @@
+# Git & Version Control
+.git
+.gitignore
+
+# Environment & Secrets
+.env.local
+.env.*.local
+
+# Node.js
+**/node_modules
+**/dist
+**/build
+**/.npm
+**/.cache
+
+# Python
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.pytest_cache
+**/.coverage
+**/htmlcov
+**/.venv
+**/env
+
+# IDE & OS
+.idea
+.vscode
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+
+# Documentation artifacts & logs
+*.log

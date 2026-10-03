@@ -1,0 +1,75 @@
+﻿[
+  {
+    "classe": "Bruto / Estrutura",
+    "itens": [
+      { "tipo": "Cimento CP II-Z-32", "unidade_padrao": "saco 50kg", "fator_embalagem": 1 },
+      { "tipo": "Areia Média Lavada", "unidade_padrao": "m³", "fator_embalagem": 1 },
+      { "tipo": "Pedra Brita nº 1", "unidade_padrao": "m³", "fator_embalagem": 1 },
+      { "tipo": "Bloco Cerâmico 9 furos", "unidade_padrao": "un", "fator_embalagem": 1 },
+      { "tipo": "Argamassa AC-III", "unidade_padrao": "saco 20kg", "fator_embalagem": 1 },
+      { "tipo": "Impermeabilizante Flexível Polimérico", "unidade_padrao": "caixa 18kg", "fator_embalagem": 1 }
+    ]
+  },
+  {
+    "classe": "Revestimentos",
+    "itens": [
+      { "tipo": "Piso Porcelanato Esmaltado Retificado", "unidade_padrao": "m²", "fator_embalagem": 2.14 },
+      { "tipo": "Azulejo de Parede Cerâmico Retificado", "unidade_padrao": "m²", "fator_embalagem": 2.00 },
+      { "tipo": "Rejunte Acrílico/Epóxi", "unidade_padrao": "kg", "fator_embalagem": 1 }
+    ]
+  },
+  {
+    "classe": "Hidráulica",
+    "itens": [
+      { "tipo": "Tubo PVC Soldável Água Fria 25mm/32mm", "unidade_padrao": "barra 6m", "fator_embalagem": 1 },
+      { "tipo": "Tubos e Conexões Esgoto 100mm/50mm/40mm", "unidade_padrao": "lote", "fator_embalagem": 1 },
+      { "tipo": "Registro de Gaveta e Pressão", "unidade_padrao": "un", "fator_embalagem": 1 },
+      { "tipo": "Ralo Sifonado Anti-odor com Grelha Inox", "unidade_padrao": "un", "fator_embalagem": 1 }
+    ]
+  },
+  {
+    "classe": "Elétrica",
+    "itens": [
+      { "tipo": "Cabos Flexíveis 750V (2,5 / 4,0 / 6,0 mm²)", "unidade_padrao": "rolo 100m", "fator_embalagem": 1 },
+      { "tipo": "Eletrodutos corrugados e caixas 4x2 / 4x4", "unidade_padrao": "lote", "fator_embalagem": 1 },
+      { "tipo": "Tomadas, interruptores e disjuntores DIN", "unidade_padrao": "lote", "fator_embalagem": 1 },
+      { "tipo": "Painéis Plafon LED Embutir 18W/24W", "unidade_padrao": "un", "fator_embalagem": 1 }
+    ]
+  },
+  {
+    "classe": "Louças & Metais",
+    "itens": [
+      { "tipo": "Bacia Sanitária c/ Caixa Acoplada 3/6L", "unidade_padrao": "conjunto", "fator_embalagem": 1 },
+      { "tipo": "Lavatório / Cuba de Embutir", "unidade_padrao": "un", "fator_embalagem": 1 },
+      { "tipo": "Torneira de Mesa / Antivandalismo", "unidade_padrao": "un", "fator_embalagem": 1 },
+      { "tipo": "Chuveiro Elétrico c/ Pressurizador", "unidade_padrao": "un", "fator_embalagem": 1 },
+      { "tipo": "Mictório Louça c/ Válvula Automática", "unidade_padrao": "un", "fator_embalagem": 1 }
+    ]
+  },
+  {
+    "classe": "Marmoraria",
+    "itens": [
+      { "tipo": "Divisórias em Granito Cinza Corumbá Polido", "unidade_padrao": "lote", "fator_embalagem": 1 },
+      { "tipo": "Soleiras e Peitoris em Granito Polido", "unidade_padrao": "un", "fator_embalagem": 1 }
+    ]
+  },
+  {
+    "classe": "Gesso & Forro",
+    "itens": [
+      { "tipo": "Placas de Gesso Acartonado RU e Perfis", "unidade_padrao": "lote", "fator_embalagem": 1 }
+    ]
+  },
+  {
+    "classe": "Pintura",
+    "itens": [
+      { "tipo": "Tinta Acrílica Premium Fosca", "unidade_padrao": "balde 18L", "fator_embalagem": 1 },
+      { "tipo": "Massa Corrida, Selador, Lixas e Rolos", "unidade_padrao": "lote", "fator_embalagem": 1 }
+    ]
+  },
+  {
+    "classe": "Caçambas & Infra",
+    "itens": [
+      { "tipo": "Caçamba Estacionária para Entulho 5 m³", "unidade_padrao": "un", "fator_embalagem": 1 }
+    ]
+  }
+]

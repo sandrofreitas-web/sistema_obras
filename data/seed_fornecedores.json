@@ -1,0 +1,58 @@
+﻿[
+  {
+    "id": 1,
+    "nome": "JER Depósito de Mat. Construção",
+    "tipo_parceiro": "Depósito de Bairro",
+    "especialidade": "Cimento, areia, brita, blocos, argamassa e insumos brutos",
+    "historico_compras_2024": 3479.25,
+    "status": "Homologado"
+  },
+  {
+    "id": 2,
+    "nome": "Telhanorte",
+    "tipo_parceiro": "Home Center",
+    "especialidade": "Pisos, revestimentos cerâmicos, louças sanitárias, caixas acopladas e portas",
+    "historico_compras_2024": 5808.48,
+    "status": "Homologado"
+  },
+  {
+    "id": 3,
+    "nome": "Leroy Merlin",
+    "tipo_parceiro": "Home Center",
+    "especialidade": "Ralos sifonados, registros, chuveiros, plafons LED, torneiras elétricas e tintas",
+    "historico_compras_2024": 1996.40,
+    "status": "Homologado"
+  },
+  {
+    "id": 4,
+    "nome": "Hiper Pedras",
+    "tipo_parceiro": "Marmoraria",
+    "especialidade": "Soleiras, peitoris, divisórias de boxes e bancadas em granito polido",
+    "historico_compras_2024": 1151.46,
+    "status": "Homologado"
+  },
+  {
+    "id": 5,
+    "nome": "Gesso Mandaqui",
+    "tipo_parceiro": "Forros e Gesso",
+    "especialidade": "Placas drywall RU, perfis metálicos, cantoneiras e molduras",
+    "historico_compras_2024": 100.00,
+    "status": "Homologado"
+  },
+  {
+    "id": 6,
+    "nome": "ANDRA Materiais Elétricos",
+    "tipo_parceiro": "Distribuidora Elétrica",
+    "especialidade": "Cabos flexíveis 750V, quadros de distribuição, disjuntores DIN e eletrodutos",
+    "historico_compras_2024": 249.65,
+    "status": "Homologado"
+  },
+  {
+    "id": 7,
+    "nome": "Serralheria Parceira",
+    "tipo_parceiro": "Esquadrias e Vidraçaria",
+    "especialidade": "Janelas de vidro temperado, caixilhos de alumínio e ferragens sob medida",
+    "historico_compras_2024": 3680.00,
+    "status": "Homologado"
+  }
+]
