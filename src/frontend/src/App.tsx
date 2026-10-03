@@ -181,6 +181,21 @@ export function App() {
   });
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
+  const [ultimoItemRegistrado, setUltimoItemRegistrado] = useState<{
+    id?: string;
+    descricao: string;
+    fabricante?: string | null;
+    preco_vista: number;
+    preco_prazo?: number | null;
+    unidade_venda: string;
+    fator_embalagem: number;
+    loja: string;
+    foto?: string | null;
+    timestamp: string;
+    isOffline?: boolean;
+  } | null>(null);
+  const [mostrarFormularioEdicao, setMostrarFormularioEdicao] = useState<boolean>(false);
+
   // Formulário assistido
   const [formDescricao, setFormDescricao] = useState('');
   const [formFabricante, setFormFabricante] = useState('');
@@ -332,20 +347,85 @@ export function App() {
     if (file) {
       try {
         setIsAnalyzing(true);
+        setSaveMessage(null);
         const compressedBase64 = await redimensionarFoto(file);
         setPreviewImage(compressedBase64);
 
+        const lojaAtualNome = fornecedores.find(f => f.id === selectedFornecedorId)?.nome || '';
+
         if (apiOnline) {
-          // Se estiver com conexão: aciona análise OCR/IA imediatamente
-          await executarAnaliseOCR('', compressedBase64);
+          // Chamada direta ao endpoint de auto-captura (IA Multimodal + Gravação Atômica no Banco)
+          const res = await fetch(`${API_URL}/api/v1/captura/auto-capturar`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              imagem_base64: compressedBase64,
+              loja_sugerida: lojaAtualNome
+            })
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            if (data.status === 'sucesso' && data.material) {
+              const m = data.material;
+              setUltimoItemRegistrado({
+                id: m.id,
+                descricao: m.descricao,
+                fabricante: m.fabricante,
+                preco_vista: m.preco_vista,
+                preco_prazo: m.preco_prazo,
+                unidade_venda: m.unidade_venda,
+                fator_embalagem: m.fator_embalagem,
+                loja: m.loja,
+                foto: compressedBase64,
+                timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                isOffline: false
+              });
+
+              if (m.loja_id) {
+                setSelectedFornecedorId(m.loja_id);
+              }
+
+              // Preencher formulário de apoio caso o usuário queira editar
+              setFormDescricao(m.descricao);
+              setFormFabricante(m.fabricante || '');
+              setFormSku(m.modelo_sku || '');
+              setFormUnidade(m.unidade_venda || 'm²');
+              setFormFator(m.fator_embalagem || 1.0);
+              setFormPrecoVista(m.preco_vista.toString());
+              setFormPrecoPrazo(m.preco_prazo ? m.preco_prazo.toString() : '');
+              setOcrConfidence(data.ocr?.confianca_ocr || 0.98);
+
+              setSaveMessage({
+                tipo: 'sucesso',
+                texto: `🎉 ${m.descricao} registrado com sucesso em ${m.loja}!`
+              });
+
+              fetchData();
+            } else {
+              // Se faltou preço ou precisa validação
+              const ocr = data.ocr || {};
+              setFormDescricao(ocr.descricao || '');
+              setFormFabricante(ocr.fabricante || '');
+              setFormSku(ocr.modelo_sku || '');
+              setFormUnidade(ocr.unidade_venda || 'un');
+              setFormFator(ocr.fator_embalagem || 1.0);
+              setFormPrecoVista(ocr.preco_vista ? ocr.preco_vista.toString() : '');
+              setFormPrecoPrazo(ocr.preco_prazo ? ocr.preco_prazo.toString() : '');
+              setMostrarFormularioEdicao(true);
+            }
+          } else {
+            // Fallback se o endpoint falhar
+            await executarAnaliseOCR('', compressedBase64);
+            setMostrarFormularioEdicao(true);
+          }
         } else {
           // Se estiver no MODO AVIÃO / OFFLINE no depósito:
-          // Salva a foto na fila local do celular instantaneamente (Zero Digitação)!
           const itemOffline: OfflineCaptura = {
             id: 'off_' + Date.now(),
             fornecedor_id: Number(selectedFornecedorId),
-            fornecedor_nome: fornecedores.find(f => f.id === Number(selectedFornecedorId))?.nome || 'Loja',
-            descricao: `Etiqueta fotografada às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
+            fornecedor_nome: lojaAtualNome || 'Loja Física',
+            descricao: `Etiqueta capturada às ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`,
             fabricante: null,
             modelo_sku: null,
             categoria_id: null,
@@ -365,15 +445,29 @@ export function App() {
             console.error('Falha de armazenamento local:', storageErr);
           }
 
+          setUltimoItemRegistrado({
+            descricao: itemOffline.descricao,
+            preco_vista: 0,
+            unidade_venda: 'un',
+            fator_embalagem: 1.0,
+            loja: itemOffline.fornecedor_nome,
+            foto: compressedBase64,
+            timestamp: itemOffline.timestamp,
+            isOffline: true
+          });
+
           setSaveMessage({
             tipo: 'sucesso',
-            texto: '📸 Foto da etiqueta salva no celular! (Modo Disparo Rápido — Zero Digitação). Quando conectar ao Wi-Fi, a IA extrairá todos os dados.'
+            texto: '📸 Foto da etiqueta salva no celular (Modo Offline)! Ao conectar ao Wi-Fi, ela será gravada no banco.'
           });
         }
       } catch (err) {
         console.error('Erro ao processar imagem:', err);
       } finally {
         setIsAnalyzing(false);
+        if (e.target) {
+          e.target.value = '';
+        }
       }
     }
   };
@@ -416,8 +510,20 @@ export function App() {
 
       if (res && res.ok) {
         setSaveMessage({ tipo: 'sucesso', texto: '✅ Item cadastrado e preço registrado no banco de dados!' });
+        setUltimoItemRegistrado({
+          descricao: payload.descricao,
+          fabricante: payload.fabricante,
+          preco_vista: payload.preco_vista,
+          preco_prazo: payload.preco_prazo,
+          unidade_venda: payload.unidade_venda,
+          fator_embalagem: payload.fator_embalagem,
+          loja: fornecedores.find(f => f.id === Number(selectedFornecedorId))?.nome || 'Loja',
+          foto: previewImage,
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+          isOffline: false
+        });
+        setMostrarFormularioEdicao(false);
         fetchData();
-        limparFormulario();
       } else {
         // Fallback: Gravação no Armazenamento Local do Celular (Modo Offline)
         const itemOffline: OfflineCaptura = {
@@ -435,11 +541,24 @@ export function App() {
           console.error('Falha ao gravar no localStorage:', e);
         }
 
+        setUltimoItemRegistrado({
+          descricao: itemOffline.descricao,
+          fabricante: itemOffline.fabricante,
+          preco_vista: itemOffline.preco_vista,
+          preco_prazo: itemOffline.preco_prazo,
+          unidade_venda: itemOffline.unidade_venda,
+          fator_embalagem: itemOffline.fator_embalagem,
+          loja: itemOffline.fornecedor_nome,
+          foto: previewImage,
+          timestamp: itemOffline.timestamp,
+          isOffline: true
+        });
+
         setSaveMessage({
           tipo: 'sucesso',
           texto: '📱 Gravado localmente no celular (Modo Offline)! O item será descarregado assim que conectar ao Wi-Fi.'
         });
-        limparFormulario();
+        setMostrarFormularioEdicao(false);
       }
     } catch (err) {
       console.error('Erro ao processar captura:', err);
@@ -450,14 +569,10 @@ export function App() {
   };
 
   const limparFormulario = () => {
-    setTimeout(() => {
-      setPreviewImage(null);
-      setOcrRawText('');
-      setFormDescricao('');
-      setFormPrecoVista('');
-      setFormPrecoPrazo('');
-      setFormSku('');
-    }, 2500);
+    setFormDescricao('');
+    setFormPrecoVista('');
+    setFormPrecoPrazo('');
+    setFormSku('');
   };
 
   // Sincronizar Fila Offline para o Banco de Dados Local ao Reconectar
@@ -963,6 +1078,28 @@ export function App() {
               )}
             </div>
 
+            {/* Feedback Visual de Processamento da IA */}
+            {isAnalyzing && (
+              <div style={{
+                marginTop: '1rem',
+                background: 'rgba(245, 158, 11, 0.12)',
+                border: '1px solid var(--amber-primary)',
+                borderRadius: '12px',
+                padding: '1rem',
+                textAlign: 'center',
+                color: 'var(--amber-primary)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '0.6rem',
+                fontSize: '0.9rem',
+                fontWeight: 700
+              }}>
+                <RefreshCw size={20} className="animate-spin" />
+                <span>🧠 IA Gemini Multimodal lendo a etiqueta e gravando no banco...</span>
+              </div>
+            )}
+
             {/* Atalhos de Demonstração Rápida */}
             <div style={{ marginTop: '1rem', borderTop: '1px solid var(--border-subtle)', paddingTop: '0.85rem' }}>
               <span style={{ fontSize: '0.75rem', color: 'var(--text-dim)', display: 'block', marginBottom: '0.5rem' }}>
@@ -993,7 +1130,147 @@ export function App() {
             </div>
           </div>
 
+          {/* ========================================================================= */}
+          {/* DESTAQUE PRINCIPAL: CARD DE CONFIRMAÇÃO DO ITEM REGISTRADO (ZERO DIGITAÇÃO) */}
+          {/* ========================================================================= */}
+          {ultimoItemRegistrado && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(15, 23, 42, 0.98) 100%)',
+              border: ultimoItemRegistrado.isOffline ? '2px solid var(--amber-primary)' : '2px solid var(--emerald-success)',
+              borderRadius: '16px',
+              padding: '1.25rem',
+              boxShadow: ultimoItemRegistrado.isOffline ? 'var(--shadow-glow)' : '0 8px 32px rgba(16, 185, 129, 0.25)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '1rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.5rem' }}>
+                <span style={{
+                  background: ultimoItemRegistrado.isOffline ? 'rgba(245, 158, 11, 0.2)' : 'rgba(16, 185, 129, 0.2)',
+                  color: ultimoItemRegistrado.isOffline ? 'var(--amber-primary)' : 'var(--emerald-success)',
+                  padding: '0.3rem 0.75rem',
+                  borderRadius: '999px',
+                  fontWeight: 800,
+                  fontSize: '0.8rem',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.45rem'
+                }}>
+                  {ultimoItemRegistrado.isOffline ? <CloudUpload size={16} /> : <CheckCircle2 size={16} />}
+                  {ultimoItemRegistrado.isOffline ? '📱 Salvo no Celular (Modo Offline)' : '✅ Produto Registrado no Catálogo!'}
+                </span>
+                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                  Capturado às {ultimoItemRegistrado.timestamp}
+                </span>
+              </div>
+
+              {/* Informações do Produto Lido */}
+              <div style={{ display: 'flex', gap: '1rem', alignItems: 'center', flexWrap: 'wrap' }}>
+                {ultimoItemRegistrado.foto && (
+                  <img
+                    src={ultimoItemRegistrado.foto}
+                    alt="Foto da Etiqueta"
+                    style={{
+                      width: '90px',
+                      height: '90px',
+                      borderRadius: '12px',
+                      objectFit: 'cover',
+                      border: '1px solid var(--border-subtle)',
+                      flexShrink: 0
+                    }}
+                  />
+                )}
+                <div style={{ flex: 1, minWidth: '200px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
+                    <span style={{
+                      background: 'var(--amber-gradient)',
+                      color: '#090d16',
+                      padding: '0.15rem 0.5rem',
+                      borderRadius: '6px',
+                      fontSize: '0.72rem',
+                      fontWeight: 800
+                    }}>
+                      {ultimoItemRegistrado.loja}
+                    </span>
+                    {ultimoItemRegistrado.fabricante && (
+                      <span style={{ color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        Marca: <strong style={{ color: '#fff' }}>{ultimoItemRegistrado.fabricante}</strong>
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 style={{ fontSize: '1.05rem', fontWeight: 800, color: '#fff', margin: '0.25rem 0' }}>
+                    {ultimoItemRegistrado.descricao}
+                  </h3>
+
+                  {ultimoItemRegistrado.preco_vista > 0 ? (
+                    <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.6rem', marginTop: '0.4rem', flexWrap: 'wrap' }}>
+                      <span style={{ fontSize: '1.35rem', fontWeight: 900, color: 'var(--emerald-success)' }}>
+                        {formatCurrency(ultimoItemRegistrado.preco_vista)}
+                        <span style={{ fontSize: '0.8rem', fontWeight: 500, color: 'var(--text-muted)' }}>
+                          /{ultimoItemRegistrado.unidade_venda}
+                        </span>
+                      </span>
+                      {ultimoItemRegistrado.fator_embalagem > 1 && (
+                        <span style={{ fontSize: '0.82rem', color: 'var(--amber-primary)', fontWeight: 600 }}>
+                          ({formatCurrency(ultimoItemRegistrado.preco_vista * ultimoItemRegistrado.fator_embalagem)} / cx de {ultimoItemRegistrado.fator_embalagem} {ultimoItemRegistrado.unidade_venda})
+                        </span>
+                      )}
+                    </div>
+                  ) : (
+                    <span style={{ fontSize: '0.8rem', color: 'var(--amber-primary)', fontWeight: 600 }}>
+                      Preço será extraído ao sincronizar com Wi-Fi
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Ações Rápidas: Disparo Próximo Produto + Ajustar */}
+              <div style={{ display: 'flex', gap: '0.75rem', marginTop: '0.25rem', flexWrap: 'wrap' }}>
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    flex: '2 1 200px',
+                    background: 'var(--amber-gradient)',
+                    color: '#090d16',
+                    fontWeight: 800,
+                    fontSize: '0.92rem',
+                    padding: '0.85rem 1rem',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.5rem',
+                    boxShadow: 'var(--shadow-glow)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <Camera size={20} />
+                  Fotografar Próxima Etiqueta
+                </button>
+
+                <button
+                  onClick={() => setMostrarFormularioEdicao(!mostrarFormularioEdicao)}
+                  style={{
+                    flex: '1 1 120px',
+                    background: 'rgba(255, 255, 255, 0.06)',
+                    border: '1px solid var(--border-subtle)',
+                    color: 'var(--text-main)',
+                    fontWeight: 600,
+                    fontSize: '0.82rem',
+                    padding: '0.85rem 0.5rem',
+                    borderRadius: '12px',
+                    cursor: 'pointer'
+                  }}
+                >
+                  {mostrarFormularioEdicao ? 'Ocultar Detalhes' : '✏️ Ajustar Detalhes'}
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Card 2: Formulário de Confirmação & Validação Humana Assistida */}
+          {(mostrarFormularioEdicao || !ultimoItemRegistrado) && (
           <div style={{
             background: 'var(--bg-card)',
             border: '1px solid var(--border-subtle)',
@@ -1286,6 +1563,7 @@ export function App() {
               </button>
             </div>
           </div>
+          )}
 
           {/* Card 3: Catálogo em Campo & Cotações Recentes */}
           <div style={{

@@ -223,21 +223,21 @@ def analisar_etiqueta_ocr(payload: OCRAnaliseRequest, db: Session = Depends(get_
                     mime_type = "image/webp"
 
             prompt_instrucao = (
-                "Você é um especialista em suprimentos de construção civil e leitura de etiquetas de gôndola e embalagens "
-                "de materiais (como Telhanorte, Leroy Merlin, depósitos de bairro). "
-                "Analise cuidadosamente a imagem da etiqueta e retorne ESTRITAMENTE um objeto JSON válido (sem tags markdown): "
+                "Você é um especialista em suprimentos de construção civil e leitura de etiquetas de gôndola e caixas/embalagens "
+                "de materiais (como Telhanorte, Leroy Merlin, C&C, depósitos de bairro). "
+                "Analise a imagem da etiqueta/embalagem e retorne ESTRITAMENTE um objeto JSON válido (sem tags markdown nem explicações): "
                 "{\n"
-                '  "descricao": "Nome comercial completo e nítido do produto (ex: Porcelanato Retificado Bianco 60x60)",\n'
-                '  "fabricante": "Marca/Fabricante detectado (ex: Portobello, Celite, Tigre, Votoran, Deca, Coral, etc)",\n'
-                '  "modelo_sku": "Código de barras, referência ou SKU impresso na etiqueta",\n'
-                '  "preco_vista": 0.00 (Número float com o preço à vista/Pix/dinheiro),\n'
-                '  "preco_prazo": 0.00 (Número float com o preço parcelado se houver, ou null),\n'
-                '  "unidade_venda": "unidade comercial (ex: cx, m², un, saco, lata)",\n'
-                '  "fator_embalagem": 1.0 (Metragem por caixa em m², ou kg por saco, ou litros por lata. Se unitário, 1.0)\n'
+                '  "descricao": "Nome comercial completo e nítido do produto (ex: Porcelanato Khali Offwhite AC 90x90)",\n'
+                '  "fabricante": "Marca/Fabricante detectado (ex: Eliane, Portobello, Celite, Tigre, Votoran, Deca, etc)",\n'
+                '  "modelo_sku": "Código de barras, referência ou SKU impresso na etiqueta se visível, ou null",\n'
+                '  "preco_vista": 0.00 (Número float com o preço à vista/Pix/m2/unidade impresso),\n'
+                '  "preco_prazo": 0.00 (Número float com o preço parcelado/a prazo se houver, ou null),\n'
+                '  "unidade_venda": "m²",\n'
+                '  "fator_embalagem": 1.0 (Metragem por caixa em m², ou kg por saco, ou litros por lata. Exemplo se CX 1.62M2, retorne 1.62),\n'
+                '  "loja_detectada": "Nome da loja se houver logo ou texto visível na imagem (ex: Telhanorte, Leroy Merlin, JER, etc) ou null"\n'
                 "}"
             )
 
-            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={settings.GEMINI_API_KEY}"
             req_body = {
                 "contents": [
                     {
@@ -257,12 +257,22 @@ def analisar_etiqueta_ocr(payload: OCRAnaliseRequest, db: Session = Depends(get_
                 }
             }
 
-            resp = httpx.post(gemini_url, json=req_body, timeout=25.0)
-            if resp.status_code == 200:
-                resp_data = resp.json()
-                texto_gemini = resp_data["candidates"][0]["content"]["parts"][0]["text"]
-                dados_ia = json.loads(texto_gemini)
+            candidate_models = ["gemini-3.5-flash", "gemini-3.6-flash", "gemini-3-flash-preview", "gemini-3.8-flash"]
+            dados_ia = None
 
+            for m in candidate_models:
+                try:
+                    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/{m}:generateContent?key={settings.GEMINI_API_KEY}"
+                    resp = httpx.post(gemini_url, json=req_body, timeout=35.0)
+                    if resp.status_code == 200:
+                        resp_data = resp.json()
+                        texto_gemini = resp_data["candidates"][0]["content"]["parts"][0]["text"]
+                        dados_ia = json.loads(texto_gemini)
+                        break
+                except Exception:
+                    continue
+
+            if dados_ia:
                 # Busca categoria correspondente na base
                 todas_categorias = db.query(Categoria).all()
                 categoria_sugerida_id = None
@@ -273,19 +283,30 @@ def analisar_etiqueta_ocr(payload: OCRAnaliseRequest, db: Session = Depends(get_
                         categoria_sugerida_id = cat.id
                         break
 
+                # Tentar mapear loja detectada na foto para um fornecedor homologado
+                loja_detectada_nome = dados_ia.get("loja_detectada")
+                loja_detectada_id = None
+                if loja_detectada_nome:
+                    forn = db.query(Fornecedor).filter(Fornecedor.nome.ilike(f"%{loja_detectada_nome}%")).first()
+                    if forn:
+                        loja_detectada_id = forn.id
+                        loja_detectada_nome = forn.nome
+
                 return OCRAnaliseResponse(
                     descricao=dados_ia.get("descricao", "Material Identificado via IA"),
                     fabricante=dados_ia.get("fabricante"),
-                    modelo_sku=str(dados_ia.get("modelo_sku") or ""),
+                    modelo_sku=str(dados_ia.get("modelo_sku") or "") if dados_ia.get("modelo_sku") else None,
                     unidade_venda=dados_ia.get("unidade_venda", "un"),
                     fator_embalagem=float(dados_ia.get("fator_embalagem") or 1.0),
                     preco_vista=float(dados_ia.get("preco_vista") or 0.0),
                     preco_prazo=float(dados_ia.get("preco_prazo")) if dados_ia.get("preco_prazo") else None,
                     categoria_sugerida_id=categoria_sugerida_id,
+                    loja_detectada=loja_detectada_nome,
+                    loja_detectada_id=loja_detectada_id,
                     confianca_ocr=0.98,
-                    observacoes="Leitura realizada com inteligência artificial multimodal (Gemini 3.8 Flash)"
+                    observacoes="Leitura realizada com inteligência artificial multimodal (Google Gemini Vision)"
                 )
-        except Exception as e:
+        except Exception:
             # Em caso de falha de conexão com a API externa, segue para o motor local
             pass
 
@@ -374,6 +395,98 @@ def analisar_etiqueta_ocr(payload: OCRAnaliseRequest, db: Session = Depends(get_
         confianca_ocr=0.92,
         observacoes=f"Processado via motor de extração multimodal para {loja or 'loja física'}",
     )
+
+
+@api_router.post("/captura/auto-capturar")
+def auto_capturar_etiqueta(payload: OCRAnaliseRequest, db: Session = Depends(get_db)):
+    """
+    Fluxo Direto de Captura Zero Digitação:
+    1. Executa leitura multimodal por IA Gemini da foto da etiqueta
+    2. Identifica produto, fabricante, conversor de embalagem e preços
+    3. Se houver preço e descrição, cadastra/atualiza o material e salva a cotação no banco automaticamente
+    4. Retorna os dados completos para confirmação imediata no celular
+    """
+    ocr_res = analisar_etiqueta_ocr(payload, db)
+
+    # Identificar loja (preferência pela loja detectada na foto, fallback pela loja sugerida)
+    fornecedor = None
+    if ocr_res.loja_detectada_id:
+        fornecedor = db.query(Fornecedor).filter_by(id=ocr_res.loja_detectada_id).first()
+
+    if not fornecedor and payload.loja_sugerida:
+        fornecedor = db.query(Fornecedor).filter(Fornecedor.nome.ilike(f"%{payload.loja_sugerida}%")).first()
+
+    if not fornecedor:
+        fornecedor = db.query(Fornecedor).first()
+
+    fornecedor_id = fornecedor.id if fornecedor else 1
+    fornecedor_nome = fornecedor.nome if fornecedor else "Loja Geral"
+
+    # Se a IA extraiu preço e descrição válida, grava automaticamente no banco
+    if ocr_res.preco_vista > 0 and ocr_res.descricao and len(ocr_res.descricao) >= 3:
+        material = None
+        if ocr_res.modelo_sku:
+            material = db.query(Material).filter_by(modelo_sku=ocr_res.modelo_sku).first()
+        if not material:
+            material = db.query(Material).filter_by(descricao=ocr_res.descricao.strip()).first()
+
+        if not material:
+            material = Material(
+                descricao=ocr_res.descricao.strip(),
+                fabricante=ocr_res.fabricante,
+                modelo_sku=ocr_res.modelo_sku,
+                categoria_id=ocr_res.categoria_sugerida_id,
+                unidade_venda=ocr_res.unidade_venda or "un",
+                fator_embalagem=ocr_res.fator_embalagem or 1.0,
+                foto_referencia_url=payload.imagem_base64,
+            )
+            db.add(material)
+            db.flush()
+        else:
+            if ocr_res.categoria_sugerida_id and not material.categoria_id:
+                material.categoria_id = ocr_res.categoria_sugerida_id
+            if ocr_res.fator_embalagem and material.fator_embalagem == 1.0:
+                material.fator_embalagem = ocr_res.fator_embalagem
+            if payload.imagem_base64 and not material.foto_referencia_url:
+                material.foto_referencia_url = payload.imagem_base64
+
+        novo_preco = PrecoCaptura(
+            material_id=material.id,
+            fornecedor_id=fornecedor_id,
+            preco_vista=ocr_res.preco_vista,
+            preco_prazo=ocr_res.preco_prazo,
+            foto_etiqueta_url=payload.imagem_base64,
+            data_captura=datetime.utcnow(),
+        )
+        db.add(novo_preco)
+        db.commit()
+        db.refresh(material)
+
+        return {
+            "status": "sucesso",
+            "mensagem": f"✅ {material.descricao} registrado com sucesso em {fornecedor_nome}!",
+            "material": {
+                "id": material.id,
+                "descricao": material.descricao,
+                "fabricante": material.fabricante,
+                "modelo_sku": material.modelo_sku,
+                "unidade_venda": material.unidade_venda,
+                "fator_embalagem": float(material.fator_embalagem or 1.0),
+                "loja": fornecedor_nome,
+                "loja_id": fornecedor_id,
+                "preco_vista": float(novo_preco.preco_vista),
+                "preco_prazo": float(novo_preco.preco_prazo) if novo_preco.preco_prazo else None,
+                "foto_url": payload.imagem_base64,
+            },
+            "ocr": ocr_res.dict()
+        }
+
+    return {
+        "status": "pendente_validacao",
+        "mensagem": "Dados extraídos pela IA. Verifique e confirme no formulário.",
+        "material": None,
+        "ocr": ocr_res.dict()
+    }
 
 
 @api_router.post("/captura/salvar")

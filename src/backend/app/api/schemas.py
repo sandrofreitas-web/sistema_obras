@@ -72,5 +72,7 @@ class OCRAnaliseResponse(BaseModel):
     preco_vista: float
     preco_prazo: Optional[float] = None
     categoria_sugerida_id: Optional[int] = None
+    loja_detectada: Optional[str] = None
+    loja_detectada_id: Optional[int] = None
     confianca_ocr: float
     observacoes: Optional[str] = None
