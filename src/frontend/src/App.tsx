@@ -26,7 +26,11 @@ import {
   Image as ImageIcon,
   CheckCircle,
   TrendingDown,
-  ArrowRight
+  ArrowRight,
+  Wifi,
+  WifiOff,
+  Database,
+  CloudUpload
 } from 'lucide-react';
 
 interface Fornecedor {
@@ -102,6 +106,22 @@ interface CapturaItem {
   foto_etiqueta_url: string | null;
 }
 
+interface OfflineCaptura {
+  id: string;
+  fornecedor_id: number;
+  fornecedor_nome: string;
+  descricao: string;
+  fabricante: string | null;
+  modelo_sku: string | null;
+  categoria_id: number | null;
+  unidade_venda: string;
+  fator_embalagem: number;
+  preco_vista: number;
+  preco_prazo: number | null;
+  foto_etiqueta_url: string | null;
+  timestamp: string;
+}
+
 // Exemplos pré-carregados de etiquetas reais para teste rápido
 const EXEMPLOS_ETIQUETA = [
   {
@@ -149,6 +169,17 @@ export function App() {
   const [saveMessage, setSaveMessage] = useState<{ tipo: 'sucesso' | 'erro'; texto: string } | null>(null);
   const [ocrConfidence, setOcrConfidence] = useState<number | null>(null);
   const [buscaMaterial, setBuscaMaterial] = useState<string>('');
+
+  // Fila de Sincronização Offline (Armazenada no celular)
+  const [offlineQueue, setOfflineQueue] = useState<OfflineCaptura[]>(() => {
+    try {
+      const saved = localStorage.getItem('obras_offline_queue');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [isSyncing, setIsSyncing] = useState<boolean>(false);
 
   // Formulário assistido
   const [formDescricao, setFormDescricao] = useState('');
@@ -276,64 +307,118 @@ export function App() {
     }
   };
 
-  // Gravar no Catálogo & Histórico
+  // Gravar no Catálogo & Histórico (Com suporte a Modo Offline)
   const handleSalvarCaptura = async () => {
     if (!formDescricao || !formPrecoVista || !selectedFornecedorId) {
       setSaveMessage({ tipo: 'erro', texto: 'Preencha a descrição, a loja e o preço à vista.' });
       return;
     }
 
+    const payload = {
+      fornecedor_id: Number(selectedFornecedorId),
+      descricao: formDescricao,
+      fabricante: formFabricante || null,
+      modelo_sku: formSku || null,
+      categoria_id: formCategoriaId ? Number(formCategoriaId) : null,
+      unidade_venda: formUnidade,
+      fator_embalagem: Number(formFator) || 1.0,
+      preco_vista: parseFloat(formPrecoVista.replace(',', '.')),
+      preco_prazo: formPrecoPrazo ? parseFloat(formPrecoPrazo.replace(',', '.')) : null,
+      foto_etiqueta_url: previewImage || null
+    };
+
     try {
       setIsSaving(true);
       setSaveMessage(null);
 
-      const payload = {
-        fornecedor_id: Number(selectedFornecedorId),
-        descricao: formDescricao,
-        fabricante: formFabricante || null,
-        modelo_sku: formSku || null,
-        categoria_id: formCategoriaId ? Number(formCategoriaId) : null,
-        unidade_venda: formUnidade,
-        fator_embalagem: Number(formFator) || 1.0,
-        preco_vista: parseFloat(formPrecoVista.replace(',', '.')),
-        preco_prazo: formPrecoPrazo ? parseFloat(formPrecoPrazo.replace(',', '.')) : null,
-        foto_etiqueta_url: previewImage || null
-      };
+      // Tenta enviar para o servidor local se houver conexão
+      let res: Response | null = null;
+      try {
+        res = await fetch(`${API_URL}/api/v1/captura/salvar`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+      } catch (netErr) {
+        res = null; // Servidor inacessível ou sem Wi-Fi
+      }
 
-      const res = await fetch(`${API_URL}/api/v1/captura/salvar`, {
+      if (res && res.ok) {
+        setSaveMessage({ tipo: 'sucesso', texto: '✅ Item cadastrado e preço registrado no banco de dados!' });
+        fetchData();
+        limparFormulario();
+      } else {
+        // Fallback: Gravação no Armazenamento Local do Celular (Modo Offline)
+        const itemOffline: OfflineCaptura = {
+          ...payload,
+          id: 'off_' + Date.now(),
+          fornecedor_nome: fornecedores.find(f => f.id === Number(selectedFornecedorId))?.nome || 'Loja',
+          timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+        };
+
+        const novaFila = [itemOffline, ...offlineQueue];
+        setOfflineQueue(novaFila);
+        try {
+          localStorage.setItem('obras_offline_queue', JSON.stringify(novaFila));
+        } catch (e) {
+          console.error('Falha ao gravar no localStorage:', e);
+        }
+
+        setSaveMessage({
+          tipo: 'sucesso',
+          texto: '📱 Gravado localmente no celular (Modo Offline)! O item será descarregado assim que conectar ao Wi-Fi.'
+        });
+        limparFormulario();
+      }
+    } catch (err) {
+      console.error('Erro ao processar captura:', err);
+      setSaveMessage({ tipo: 'erro', texto: 'Erro interno ao processar a captura.' });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const limparFormulario = () => {
+    setTimeout(() => {
+      setPreviewImage(null);
+      setOcrRawText('');
+      setFormDescricao('');
+      setFormPrecoVista('');
+      setFormPrecoPrazo('');
+      setFormSku('');
+    }, 2500);
+  };
+
+  // Sincronizar Fila Offline para o Banco de Dados Local ao Reconectar
+  const handleSincronizarFilaOffline = async () => {
+    if (offlineQueue.length === 0) return;
+    try {
+      setIsSyncing(true);
+      setSaveMessage(null);
+
+      const res = await fetch(`${API_URL}/api/v1/captura/sincronizar-lote`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(offlineQueue)
       });
 
       if (res.ok) {
-        setSaveMessage({ tipo: 'sucesso', texto: '✅ Item cadastrado e preço registrado no catálogo!' });
-        // Recarregar listas
-        const [matRes, capRes] = await Promise.all([
-          fetch(`${API_URL}/api/v1/materiais`),
-          fetch(`${API_URL}/api/v1/precos-captura`)
-        ]);
-        if (matRes.ok) setMateriais(await matRes.json());
-        if (capRes.ok) setHistoricoCapturas(await capRes.json());
-
-        // Limpar após 3 segundos ou manter para o próximo
-        setTimeout(() => {
-          setPreviewImage(null);
-          setOcrRawText('');
-          setFormDescricao('');
-          setFormPrecoVista('');
-          setFormPrecoPrazo('');
-          setFormSku('');
-        }, 3500);
+        const data = await res.json();
+        setOfflineQueue([]);
+        localStorage.removeItem('obras_offline_queue');
+        setSaveMessage({
+          tipo: 'sucesso',
+          texto: `🎉 Sincronização concluída! ${data.total_salvos} itens descarregados no banco de dados local com sucesso!`
+        });
+        fetchData();
       } else {
-        const erroData = await res.json().catch(() => ({}));
-        setSaveMessage({ tipo: 'erro', texto: erroData.detail || 'Falha ao salvar no banco.' });
+        setSaveMessage({ tipo: 'erro', texto: 'Falha ao sincronizar. Verifique se o computador com o banco está online.' });
       }
     } catch (err) {
-      console.error('Erro ao salvar captura:', err);
-      setSaveMessage({ tipo: 'erro', texto: 'Erro de conexão com o servidor.' });
+      console.error('Falha ao conectar para sincronização:', err);
+      setSaveMessage({ tipo: 'erro', texto: 'Não foi possível conectar ao banco de dados no computador via Wi-Fi.' });
     } finally {
-      setIsSaving(false);
+      setIsSyncing(false);
     }
   };
 
@@ -525,6 +610,87 @@ export function App() {
       {activeTab === 'captura' && (
         <section style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
           
+          {/* Banner de Sincronização Offline & Armazenamento Local no Celular */}
+          {offlineQueue.length > 0 && (
+            <div style={{
+              background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.15) 0%, rgba(16, 185, 129, 0.15) 100%)',
+              border: '1px solid var(--amber-primary)',
+              borderRadius: '16px',
+              padding: '1.2rem',
+              boxShadow: 'var(--shadow-glow)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '0.85rem'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                  <div style={{ background: 'var(--amber-gradient)', padding: '0.5rem', borderRadius: '10px', color: '#090d16' }}>
+                    <CloudUpload size={22} />
+                  </div>
+                  <div>
+                    <h3 style={{ fontSize: '0.95rem', fontWeight: 800, color: '#fff' }}>
+                      {offlineQueue.length} {offlineQueue.length === 1 ? 'item capturado' : 'itens capturados'} no celular
+                    </h3>
+                    <p style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      {apiOnline ? 'Conexão Wi-Fi detectada! Pronto para descarregar no banco de dados local.' : 'Armazenado no modo offline. Conecte ao Wi-Fi para enviar ao banco.'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={handleSincronizarFilaOffline}
+                  disabled={isSyncing}
+                  style={{
+                    background: 'var(--amber-gradient)',
+                    color: '#090d16',
+                    fontWeight: 800,
+                    fontSize: '0.85rem',
+                    padding: '0.65rem 1.25rem',
+                    borderRadius: '10px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    boxShadow: 'var(--shadow-md)',
+                    cursor: isSyncing ? 'not-allowed' : 'pointer'
+                  }}
+                >
+                  <RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />
+                  {isSyncing ? 'Descarregando no Banco...' : 'Descarregar para o Banco (Wi-Fi)'}
+                </button>
+              </div>
+
+              {/* Prévia dos Itens na Fila Offline */}
+              <div style={{
+                display: 'flex',
+                gap: '0.5rem',
+                overflowX: 'auto',
+                paddingTop: '0.5rem',
+                borderTop: '1px solid rgba(255, 255, 255, 0.08)'
+              }}>
+                {offlineQueue.map((item) => (
+                  <div
+                    key={item.id}
+                    style={{
+                      background: 'rgba(15, 23, 42, 0.8)',
+                      borderRadius: '8px',
+                      padding: '0.45rem 0.75rem',
+                      fontSize: '0.75rem',
+                      whiteSpace: 'nowrap',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.4rem',
+                      border: '1px solid var(--border-subtle)'
+                    }}
+                  >
+                    <span style={{ color: 'var(--amber-primary)', fontWeight: 600 }}>[{item.fornecedor_nome}]</span>
+                    <span style={{ color: '#fff' }}>{item.descricao}</span>
+                    <span style={{ color: 'var(--emerald-success)', fontWeight: 700 }}>{formatCurrency(item.preco_vista)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Card 1: Seletor de Loja e Ação da Câmera */}
           <div style={{
             background: 'var(--bg-card)',

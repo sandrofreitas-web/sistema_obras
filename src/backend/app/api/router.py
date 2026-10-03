@@ -391,3 +391,67 @@ def list_historico_capturas(db: Session = Depends(get_db)):
         })
     return resultado
 
+
+@api_router.post("/captura/sincronizar-lote")
+def sincronizar_lote_capturas(itens: List[CapturaCompletaIn], db: Session = Depends(get_db)):
+    """
+    Recebe uma lista de materiais e preços capturados offline no celular
+    e os consolida em lote no banco de dados local da obra.
+    """
+    salvos = []
+    erros = []
+    for payload in itens:
+        try:
+            fornecedor = db.query(Fornecedor).filter_by(id=payload.fornecedor_id).first()
+            if not fornecedor:
+                erros.append(f"Fornecedor ID {payload.fornecedor_id} não encontrado")
+                continue
+
+            material = None
+            if payload.modelo_sku:
+                material = db.query(Material).filter_by(modelo_sku=payload.modelo_sku).first()
+            if not material:
+                material = db.query(Material).filter_by(descricao=payload.descricao.strip()).first()
+
+            if not material:
+                material = Material(
+                    descricao=payload.descricao.strip(),
+                    fabricante=payload.fabricante,
+                    modelo_sku=payload.modelo_sku,
+                    categoria_id=payload.categoria_id,
+                    unidade_venda=payload.unidade_venda,
+                    fator_embalagem=payload.fator_embalagem,
+                    foto_referencia_url=payload.foto_etiqueta_url,
+                )
+                db.add(material)
+                db.flush()
+            else:
+                if payload.categoria_id and not material.categoria_id:
+                    material.categoria_id = payload.categoria_id
+                if payload.fator_embalagem and material.fator_embalagem == 1.0:
+                    material.fator_embalagem = payload.fator_embalagem
+                if payload.foto_etiqueta_url and not material.foto_referencia_url:
+                    material.foto_referencia_url = payload.foto_etiqueta_url
+
+            novo_preco = PrecoCaptura(
+                material_id=material.id,
+                fornecedor_id=payload.fornecedor_id,
+                preco_vista=payload.preco_vista,
+                preco_prazo=payload.preco_prazo,
+                foto_etiqueta_url=payload.foto_etiqueta_url,
+                data_captura=datetime.utcnow(),
+            )
+            db.add(novo_preco)
+            salvos.append(material.descricao)
+        except Exception as e:
+            erros.append(str(e))
+
+    db.commit()
+    return {
+        "status": "sucesso",
+        "total_recebidos": len(itens),
+        "total_salvos": len(salvos),
+        "itens_salvos": salvos,
+        "erros": erros,
+    }
+
