@@ -33,3 +33,9 @@ uploads/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# Temporary Imports & Archives
+imported_studio/
+temp_studio_import/
+*.zip
+
