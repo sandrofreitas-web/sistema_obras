@@ -192,9 +192,7 @@ export function App() {
   const [formCategoriaId, setFormCategoriaId] = useState<number | ''>('');
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const API_URL = typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
-    ? `http://${window.location.hostname}:8080`
-    : (import.meta.env.VITE_API_URL || 'http://localhost:8080');
+  const API_URL = '';
 
   const fetchData = async () => {
     try {
