@@ -237,7 +237,7 @@ def analisar_etiqueta_ocr(payload: OCRAnaliseRequest, db: Session = Depends(get_
                 "}"
             )
 
-            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={settings.GEMINI_API_KEY}"
+            gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key={settings.GEMINI_API_KEY}"
             req_body = {
                 "contents": [
                     {
@@ -283,7 +283,7 @@ def analisar_etiqueta_ocr(payload: OCRAnaliseRequest, db: Session = Depends(get_
                     preco_prazo=float(dados_ia.get("preco_prazo")) if dados_ia.get("preco_prazo") else None,
                     categoria_sugerida_id=categoria_sugerida_id,
                     confianca_ocr=0.98,
-                    observacoes="Leitura realizada com inteligência artificial multimodal (Gemini Vision 1.5 Flash)"
+                    observacoes="Leitura realizada com inteligência artificial multimodal (Gemini 3.8 Flash)"
                 )
         except Exception as e:
             # Em caso de falha de conexão com a API externa, segue para o motor local
