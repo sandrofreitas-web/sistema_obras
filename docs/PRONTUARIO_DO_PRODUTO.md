@@ -106,12 +106,18 @@ Taxonomia padronizada compatível com a `Lista_Mestra_de_Materiais.md`:
   * **Materiais Estimados:** R$ 12.825,00 | Prazo: 3 semanas (03/11 a 24/11/2026)
 
 ### 6.2 Estrutura de Detalhamento e Gestão de Itens
-- **Eliminação da Simulação Hipotética:** A tela de projetos foca diretamente no **Detalhamento Executivo**, estruturado por **Grupos (Classes)** e **Categorias**, espelhando a Lista Mestra de Materiais.
+- **Visual Compacto em Tabela de Engenharia:** Detalhamento em grade densa de alta legibilidade, com colunas dedicadas para Status, Descrição/Especificação Técnica, Fabricante, Ambiente, Quantidade Base, Perda Técnica %, Quantidade Final de Compra, Unidade, Preço Unitário, Subtotal Calculado e Loja/Fornecedor de Cotação.
+- **Controle de Status e Evolução das Aquisições:**
+  - Alternância rápida com 1 clique diretamente na linha da tabela entre `Planejado` (pendente) e `Comprado`.
+  - Painel de progresso com barra visual e métricas dinâmicas: total de itens comprados vs pendentes, valor já executado (R$) e saldo restante a comprar (R$).
 - **CRUD Completo de Itens:**
   - **Inclusão:** Conexão direta com a base homologada de materiais (catálogo), preenchendo automaticamente fabricante, preços e unidades, ou cadastro sob demanda.
   - **Alteração:** Edição de quantitativo base, percentual de perda técnica (+5% geral, +10% a +15% para cortes de revestimentos), ambiente de aplicação e preço unitário com recálculo instantâneo.
   - **Exclusão:** Remoção segura de itens com atualização em tempo real dos subtotais e da reserva de contingência.
-- **Exportação:** Geração de relatórios executivos em PDF para canteiro e exportação de planilha detalhada em formato CSV compatível com Excel.
+- **Exportações Especializadas:**
+  - **Lista de Cotação e Aquisição (CSV):** Exportação focada em compras para envio a depósitos e lojas físicas (JER, Telhanorte, Leroy Merlin, Obramax), contendo quantitativos finais com perda, fornecedor sugerido e colunas em branco para cotação real e número de NF. Suporta exportar apenas itens pendentes ("A Comprar").
+  - **Planilha do Orçamento Executivo (CSV):** Exportação completa para controle gerencial.
+  - **Relatório PDF / Impressão:** Emissão do prontuário executivo da obra.
 
 ---
 

@@ -25,6 +25,10 @@ import {
   Sparkles,
   SlidersHorizontal,
   FolderOpen,
+  ShoppingBag,
+  ListChecks,
+  Download,
+  Check,
 } from 'lucide-react';
 import { Projeto, ItemProjeto, Material, TaxonomiaClasse } from '../types';
 import { storageService } from '../services/storageService';
@@ -123,9 +127,21 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
   const contingencyPercent = project.contingenciaPercent ?? 10;
   const contingencyValue = (rawTotalActive * contingencyPercent) / 100;
   const materialsWithContingency = rawTotalActive + contingencyValue;
-  const laborBudget = project.orcamentoMaoObra ?? 32500;
+  const laborBudget = project.orcamentoMaoObra ?? 17000;
   const globalProjectBudget = materialsWithContingency + laborBudget;
   const costPerM2 = project.areaTotalM2 > 0 ? globalProjectBudget / project.areaTotalM2 : 0;
+
+  // Acquisition Evolution & Shopping List Stats
+  const compradosCount = useMemo(() => items.filter((i) => i.comprado).length, [items]);
+  const totalComprado = useMemo(
+    () => items.filter((i) => i.comprado).reduce((acc, i) => acc + i.precoTotal, 0),
+    [items]
+  );
+  const totalPendente = useMemo(
+    () => items.filter((i) => !i.comprado).reduce((acc, i) => acc + i.precoTotal, 0),
+    [items]
+  );
+  const percentComprado = items.length > 0 ? (compradosCount / items.length) * 100 : 0;
 
   // Filter items according to search and filters
   const filteredItems = useMemo(() => {
@@ -213,7 +229,35 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
     return Array.from(set).sort();
   }, [items, taxonomia]);
 
-  // --- CRUD ACTIONS ---
+  // --- CRUD & STATUS ACTIONS ---
+
+  // Direct toggle for status Comprado / Planejado
+  const handleToggleItemComprado = (itemId: string, currentStatus: boolean) => {
+    if (!currentScenario) return;
+
+    const updatedItens = currentScenario.itens.map((it) => {
+      if (it.id === itemId) {
+        return { ...it, comprado: !currentStatus };
+      }
+      return it;
+    });
+
+    const updatedCenarios = project.cenarios.map((cen) => {
+      if (cen.id === currentScenario.id) {
+        return { ...cen, itens: updatedItens };
+      }
+      return cen;
+    });
+
+    const updatedProject: Projeto = {
+      ...project,
+      cenarios: updatedCenarios,
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    storageService.saveProject(updatedProject);
+    onProjectUpdated(updatedProject);
+  };
 
   // Open modal to add item
   const handleOpenAddItem = (preselectedClasse?: string) => {
@@ -348,14 +392,88 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
     setExpandedRooms(roomsMap);
   };
 
-  // Export to CSV
+  // --- EXPORT FUNCTIONS ---
+
+  // Exportar Lista de Aquisição e Cotação de Fornecedores (CSV)
+  const handleExportCotacaoCSV = (onlyPending = false) => {
+    const listItems = onlyPending ? items.filter((i) => !i.comprado) : items;
+
+    const rows = [
+      ['LISTA DE COMPRAS E MAPA DE COTAÇÃO DE MATERIAIS — OBRA ICENV 2026'],
+      ['PROJETO', project.nome],
+      ['PASTA DOCUMENTAL', project.pastaDocumentos || ''],
+      ['DATA EMISSÃO', new Date().toLocaleDateString('pt-BR')],
+      ['FILTRO', onlyPending ? 'APENAS ITENS PENDENTES (A COMPRAR)' : 'TODOS OS ITENS'],
+      [],
+      [
+        'Status',
+        'Grupo / Classe',
+        'Categoria',
+        'Descrição do Material / Especificação',
+        'Fabricante Sugerido',
+        'Ambiente',
+        'Qtd Base',
+        'Perda %',
+        'Qtd a Comprar (c/ Perda)',
+        'Unidade',
+        'Preço Ref. Estimado (R$)',
+        'Total Estimado (R$)',
+        'Fornecedor / Loja Referência',
+        'Preço Cotado Real (R$)',
+        'Fornecedor Escolhido',
+        'Nº Pedido / NF',
+        'Observações de Compra',
+      ],
+    ];
+
+    listItems.forEach((item) => {
+      const room = project.ambientes.find((a) => a.id === item.ambienteId)?.nome || 'Geral';
+      rows.push([
+        item.comprado ? 'COMPRADO' : 'PLANEJADO / A COMPRAR',
+        `"${item.classe}"`,
+        `"${item.categoria}"`,
+        `"${item.materialNome}"`,
+        `"${item.fabricante || ''}"`,
+        `"${room}"`,
+        String(item.quantidadeBase),
+        `${item.perdaTecnicaPercent}%`,
+        String(item.quantidadeComPerda),
+        item.unidade,
+        item.precoUnitario.toFixed(2),
+        item.precoTotal.toFixed(2),
+        `"${item.lojaReferencia || ''}"`,
+        '', // Coluna em branco para cotação na loja
+        '', // Coluna em branco para fornecedor
+        '', // Coluna em branco para nota fiscal
+        `"${item.observacoes || ''}"`,
+      ]);
+    });
+
+    const totalEstimado = listItems.reduce((acc, i) => acc + i.precoTotal, 0);
+    rows.push([]);
+    rows.push(['TOTAL GERAL ESTIMADO', '', '', '', '', '', '', '', '', '', '', totalEstimado.toFixed(2)]);
+
+    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map((e) => e.join(';')).join('\n');
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement('a');
+    link.setAttribute('href', encodedUri);
+    const filename = `lista_cotacao_${onlyPending ? 'pendentes_' : ''}${project.nome.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`;
+    link.setAttribute('download', filename);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  // Exportar Planilha Completa Detalhada do Orçamento (CSV)
   const handleExportCSV = () => {
     const rows = [
+      ['DETALHAMENTO EXECUTIVO DO ORÇAMENTO — OBRA ICENV 2026'],
       ['PROJETO', project.nome],
       ['PASTA DOCUMENTOS', project.pastaDocumentos || ''],
       ['DATA EXPORTACAO', new Date().toLocaleDateString('pt-BR')],
       [],
       [
+        'Status',
         'Grupo / Classe',
         'Categoria',
         'Material / Descrição',
@@ -363,11 +481,12 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         'Ambiente',
         'Qtd Base',
         'Perda %',
-        'Qtd Final',
+        'Qtd Compra (Final)',
         'Unidade',
         'Preço Unitário (R$)',
         'Total (R$)',
-        'Status',
+        'Loja Referência',
+        'Observações',
       ],
     ];
 
@@ -376,6 +495,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         cat.itens.forEach((item) => {
           const room = project.ambientes.find((a) => a.id === item.ambienteId)?.nome || 'Geral';
           rows.push([
+            item.comprado ? 'Comprado' : 'Planejado',
             `"${g.grupoNome}"`,
             `"${cat.categoriaNome}"`,
             `"${item.materialNome}"`,
@@ -387,7 +507,8 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
             item.unidade,
             item.precoUnitario.toFixed(2),
             item.precoTotal.toFixed(2),
-            item.comprado ? 'Comprado' : 'Planejado',
+            `"${item.lojaReferencia || ''}"`,
+            `"${item.observacoes || ''}"`,
           ]);
         });
       });
@@ -404,14 +525,14 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `detalhamento_obra_${project.nome.toLowerCase().replace(/\s+/g, '_')}.csv`);
+    link.setAttribute('download', `orcamento_executivo_${project.nome.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-5 pb-20">
       {/* Sequential Phase Switcher Bar */}
       {projects && projects.length > 1 && onSelectProject && (
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
@@ -458,7 +579,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
           <div>
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 uppercase tracking-wider">
-                {project.status === 'em_andamento' ? 'Obra em Andamento' : 'Planejamento Executivo'}
+                {project.status === 'em_andamento' ? 'Fase 1 — Em Execução' : 'Fase 2 — Sequencial'}
               </span>
               <span className="text-xs text-slate-400 flex items-center gap-1">
                 <Building className="w-3.5 h-3.5 text-slate-400" />
@@ -480,29 +601,40 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
             </p>
           </div>
 
-          {/* Action Buttons */}
-          <div className="flex items-center gap-2.5 flex-wrap self-start lg:self-auto">
+          {/* Action Buttons: Add Item & Export Options */}
+          <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
             <button
               onClick={() => handleOpenAddItem()}
               className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-lg active:scale-95 transition-all"
             >
               <Plus className="w-4 h-4" />
-              <span>+ Incluir Item no Orçamento</span>
+              <span>+ Incluir Item</span>
             </button>
 
+            {/* Export Lista de Cotação (CSV) */}
+            <button
+              onClick={() => handleExportCotacaoCSV(false)}
+              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-bold text-emerald-300 transition-colors"
+              title="Exportar Lista para Cotação e Compras em Lojas"
+            >
+              <ListChecks className="w-4 h-4 text-emerald-400" />
+              <span>Lista de Cotação (CSV)</span>
+            </button>
+
+            {/* Export Orçamento Geral (CSV) */}
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
-              title="Exportar Planilha Excel/CSV Detalhada"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
+              title="Exportar Planilha Completa do Orçamento"
             >
-              <FileSpreadsheet className="w-4 h-4 text-emerald-400" />
-              <span>Exportar CSV</span>
+              <FileSpreadsheet className="w-4 h-4 text-slate-300" />
+              <span>Orçamento (CSV)</span>
             </button>
 
             <button
               onClick={onOpenPrintBudget}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
-              title="Visualizar Impressão ou Gerar PDF"
+              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
+              title="Visualizar Impressão ou Gerar PDF Executivo"
             >
               <Printer className="w-4 h-4 text-amber-400" />
               <span>Imprimir / PDF</span>
@@ -511,16 +643,69 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         </div>
       </div>
 
+      {/* Acquisition Progress Bar & Shopping Evolution */}
+      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap">
+            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
+              <ShoppingBag className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-white uppercase tracking-wider">
+                  Evolução das Aquisições (Lista de Compras)
+                </span>
+                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold">
+                  {compradosCount} de {items.length} itens comprados ({percentComprado.toFixed(0)}%)
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-400 mt-0.5">
+                Clique diretamente no status de cada item da tabela para alternar entre Planejado e Comprado.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 text-xs flex-wrap sm:justify-end">
+            <div className="bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded-xl">
+              <span className="text-slate-400 mr-1.5">Já Comprado:</span>
+              <strong className="text-emerald-400 font-black">R$ {totalComprado.toFixed(2)}</strong>
+            </div>
+            <div className="bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded-xl">
+              <span className="text-slate-400 mr-1.5">A Comprar:</span>
+              <strong className="text-amber-400 font-black">R$ {totalPendente.toFixed(2)}</strong>
+            </div>
+            {totalPendente > 0 && (
+              <button
+                onClick={() => handleExportCotacaoCSV(true)}
+                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1"
+                title="Exportar apenas itens pendentes para cotação"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Baixar Pendentes
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
+          <div
+            className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
+            style={{ width: `${Math.min(percentComprado, 100)}%` }}
+          />
+        </div>
+      </div>
+
       {/* KPI Cards: Executive Financial Overview */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* Subtotal Materiais */}
         <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-          <span className="text-xs text-slate-400 font-medium">Subtotal Materiais (Lista Mestra)</span>
+          <span className="text-xs text-slate-400 font-medium">Subtotal Materiais</span>
           <div className="text-lg sm:text-2xl font-black text-white mt-1">
             R$ {rawTotalActive.toFixed(2)}
           </div>
           <span className="text-[11px] text-slate-500 mt-1 block">
-            {items.length} itens orçados em {groupedData.length} grupos
+            {items.length} itens em {groupedData.length} grupos
           </span>
         </div>
 
@@ -556,9 +741,9 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
           </span>
         </div>
 
-        {/* Custo Global da Obra */}
+        {/* Custo Global da Frente */}
         <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 bg-gradient-to-br from-slate-900 to-amber-950/20">
-          <span className="text-xs text-amber-400 font-bold uppercase tracking-wider">Custo Global da Obra</span>
+          <span className="text-xs text-amber-400 font-bold uppercase tracking-wider">Custo Global da Frente</span>
           <div className="text-xl sm:text-3xl font-black text-white mt-1">
             R$ {globalProjectBudget.toFixed(2)}
           </div>
@@ -576,7 +761,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
             <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
             <input
               type="text"
-              placeholder="Filtrar itens por nome, fabricante, categoria ou ambiente..."
+              placeholder="Pesquisar por item, fabricante, categoria ou ambiente..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white placeholder-slate-500 outline-none focus:border-amber-400"
@@ -620,8 +805,8 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-400"
             >
               <option value="todos">Status: Todos</option>
-              <option value="planejado">Planejados</option>
-              <option value="comprado">Já Comprados</option>
+              <option value="planejado">Apenas Planejados / A Comprar</option>
+              <option value="comprado">Apenas Já Comprados</option>
             </select>
 
             {/* View Mode Toggle: Grupos vs Ambientes */}
@@ -634,7 +819,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Por Grupos & Categorias
+                Por Grupos
               </button>
               <button
                 onClick={() => setViewMode('ambientes')}
@@ -654,7 +839,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
           <div>
             Exibindo <strong className="text-white">{filteredItems.length}</strong> de{' '}
-            <strong className="text-white">{items.length}</strong> itens orçados
+            <strong className="text-white">{items.length}</strong> itens
             {filteredItems.length > 0 && (
               <span className="ml-2 text-emerald-400 font-semibold">
                 (Subtotal filtrado: R${' '}
@@ -681,7 +866,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         </div>
       </div>
 
-      {/* MAIN VIEW: BY GROUPS & CATEGORIES */}
+      {/* MAIN VIEW: BY GROUPS & CATEGORIES (COMPACT TABLE FORMAT) */}
       {viewMode === 'grupos' && (
         <div className="space-y-4">
           {groupedData.length === 0 ? (
@@ -711,10 +896,10 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                   className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm transition-all"
                 >
                   {/* Grupo Header */}
-                  <div className="p-4 sm:p-5 bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800">
+                  <div className="p-3.5 sm:p-4 bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800">
                     <button
                       onClick={() => toggleGroup(group.grupoNome)}
-                      className="flex items-center gap-3 text-left group flex-1"
+                      className="flex items-center gap-2.5 text-left group flex-1"
                     >
                       <div className="text-slate-400 group-hover:text-amber-400 transition-colors">
                         {isExpanded ? (
@@ -724,7 +909,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                         )}
                       </div>
 
-                      <div className="p-2 rounded-xl bg-slate-800/80 border border-slate-700/60">
+                      <div className="p-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60">
                         {getGroupIcon(group.grupoNome)}
                       </div>
 
@@ -733,19 +918,19 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                           <h3 className="text-sm sm:text-base font-extrabold text-white group-hover:text-amber-400 transition-colors">
                             {group.grupoNome}
                           </h3>
-                          <span className="text-[11px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-300 font-semibold">
+                          <span className="text-[11px] px-2 py-0.2 rounded-full bg-slate-800 text-slate-300 font-semibold">
                             {group.totalItens} {group.totalItens === 1 ? 'item' : 'itens'}
                           </span>
                         </div>
-                        <span className="text-[11px] text-slate-400 block mt-0.5">
-                          Representa {groupPercent.toFixed(1)}% do orçamento de materiais
+                        <span className="text-[10px] text-slate-400 block mt-0.5">
+                          Representa {groupPercent.toFixed(1)}% do total de materiais
                         </span>
                       </div>
                     </button>
 
                     <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
                       <div className="text-right">
-                        <span className="text-xs text-slate-400 block">Subtotal do Grupo:</span>
+                        <span className="text-[11px] text-slate-400 block">Subtotal do Grupo:</span>
                         <strong className="text-base sm:text-lg font-black text-amber-400">
                           R$ {group.subtotal.toFixed(2)}
                         </strong>
@@ -753,7 +938,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
 
                       <button
                         onClick={() => handleOpenAddItem(group.grupoNome)}
-                        className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs rounded-xl flex items-center gap-1.5 transition-all shadow"
+                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs rounded-xl flex items-center gap-1 transition-all shadow"
                         title={`Adicionar novo item no grupo ${group.grupoNome}`}
                       >
                         <Plus className="w-3.5 h-3.5 text-amber-400" />
@@ -762,18 +947,18 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                     </div>
                   </div>
 
-                  {/* Grupo Content: Categories & Items */}
+                  {/* Grupo Content: Compact Tables per Category */}
                   {isExpanded && (
-                    <div className="p-3 sm:p-5 bg-slate-950/40 space-y-4">
+                    <div className="p-2 sm:p-4 bg-slate-950/40 space-y-3">
                       {Object.values(group.categorias).map((cat) => (
                         <div
                           key={cat.categoriaNome}
-                          className="border border-slate-800/90 rounded-xl overflow-hidden bg-slate-900/70"
+                          className="border border-slate-800/90 rounded-xl overflow-hidden bg-slate-900/80 shadow-sm"
                         >
-                          {/* Categoria Header */}
-                          <div className="px-4 py-2.5 bg-slate-800/40 border-b border-slate-800/80 flex items-center justify-between">
+                          {/* Categoria Subheader */}
+                          <div className="px-3.5 py-2 bg-slate-800/50 border-b border-slate-800/80 flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <span className="w-2 h-2 rounded-full bg-amber-400"></span>
+                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
                               <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
                                 {cat.categoriaNome}
                               </h4>
@@ -786,103 +971,141 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                             </span>
                           </div>
 
-                          {/* Items Table / Responsive Rows */}
-                          <div className="divide-y divide-slate-800/60">
-                            {cat.itens.map((item) => {
-                              const room = project.ambientes.find((a) => a.id === item.ambienteId);
+                          {/* Dense Table View for Quantitativos */}
+                          <div className="overflow-x-auto">
+                            <table className="w-full text-left border-collapse text-xs">
+                              <thead>
+                                <tr className="bg-slate-950/70 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400 select-none">
+                                  <th className="py-2 px-3 font-extrabold w-28">Status</th>
+                                  <th className="py-2 px-3 font-extrabold min-w-[200px]">Item / Especificação</th>
+                                  <th className="py-2 px-2.5 font-extrabold">Ambiente</th>
+                                  <th className="py-2 px-2.5 font-extrabold text-right">Qtd Base</th>
+                                  <th className="py-2 px-2 font-extrabold text-center">Perda</th>
+                                  <th className="py-2 px-2.5 font-extrabold text-right text-amber-300">Qtd Compra</th>
+                                  <th className="py-2 px-2 font-extrabold">Unid</th>
+                                  <th className="py-2 px-3 font-extrabold text-right">Preço Unit</th>
+                                  <th className="py-2 px-3 font-extrabold text-right text-white">Subtotal</th>
+                                  <th className="py-2 px-3 font-extrabold hidden lg:table-cell">Loja / Cotação</th>
+                                  <th className="py-2 px-2.5 font-extrabold text-center w-20">Ações</th>
+                                </tr>
+                              </thead>
+                              <tbody className="divide-y divide-slate-800/50">
+                                {cat.itens.map((item) => {
+                                  const room = project.ambientes.find((a) => a.id === item.ambienteId);
 
-                              return (
-                                <div
-                                  key={item.id}
-                                  className="p-3 sm:p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:bg-slate-800/40 transition-colors"
-                                >
-                                  {/* Left: Item Info */}
-                                  <div className="min-w-0 flex-1 space-y-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                      <span className="text-xs font-bold text-amber-400">
-                                        {item.fabricante || 'Genérico'}
-                                      </span>
-                                      {item.tipo && (
-                                        <span className="text-[11px] text-slate-400">
-                                          • {item.tipo}
-                                        </span>
-                                      )}
-                                      {room && (
-                                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded-md bg-slate-800 text-slate-300 border border-slate-700/60">
-                                          📍 {room.nome}
-                                        </span>
-                                      )}
-                                      {item.comprado ? (
-                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 flex items-center gap-1">
-                                          <CheckCircle2 className="w-3 h-3" />
-                                          Comprado
-                                        </span>
-                                      ) : (
-                                        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 flex items-center gap-1">
-                                          <Clock className="w-3 h-3" />
-                                          Planejado
-                                        </span>
-                                      )}
-                                    </div>
+                                  return (
+                                    <tr
+                                      key={item.id}
+                                      className="hover:bg-slate-800/40 transition-colors group"
+                                    >
+                                      {/* Status Interactive Toggle */}
+                                      <td className="py-2 px-3 whitespace-nowrap">
+                                        <button
+                                          onClick={() => handleToggleItemComprado(item.id, !!item.comprado)}
+                                          className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                                            item.comprado
+                                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                                              : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-amber-400/50 hover:text-amber-300'
+                                          }`}
+                                          title="Clique para alternar entre Planejado e Comprado"
+                                        >
+                                          {item.comprado ? (
+                                            <>
+                                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                              <span>Comprado</span>
+                                            </>
+                                          ) : (
+                                            <>
+                                              <Clock className="w-3 h-3 text-slate-400" />
+                                              <span>Planejado</span>
+                                            </>
+                                          )}
+                                        </button>
+                                      </td>
 
-                                    <h5 className="font-bold text-sm text-white">{item.materialNome}</h5>
+                                      {/* Item Description, Brand & Specs */}
+                                      <td className="py-2 px-3">
+                                        <div className="font-bold text-white text-xs leading-snug">
+                                          {item.materialNome}
+                                        </div>
+                                        <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
+                                          <span className="text-amber-400 font-semibold">{item.fabricante || 'Genérico'}</span>
+                                          {item.tipo && <span>• {item.tipo}</span>}
+                                          {item.observacoes && (
+                                            <span className="italic text-slate-400">• {item.observacoes}</span>
+                                          )}
+                                        </div>
+                                      </td>
 
-                                    <div className="flex items-center gap-3 text-xs text-slate-400 flex-wrap">
-                                      <span>
-                                        Base: <strong>{item.quantidadeBase} {item.unidade}</strong>
-                                      </span>
-                                      <span className="text-amber-300/90 font-medium">
-                                        +{item.perdaTecnicaPercent}% perda técnica ={' '}
-                                        <strong className="text-white">
-                                          {item.quantidadeComPerda} {item.unidade}
-                                        </strong>
-                                      </span>
-                                      {item.lojaReferencia && (
-                                        <span className="text-slate-500 text-[11px]">
-                                          Cotado em: {item.lojaReferencia}
+                                      {/* Room Badge */}
+                                      <td className="py-2 px-2.5 whitespace-nowrap">
+                                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60">
+                                          {room?.nome ? (room.nome.includes('Pastoral') ? 'Casa Pastoral' : room.nome.includes('Masculino') ? 'Banheiro Masc.' : room.nome) : 'Geral'}
                                         </span>
-                                      )}
-                                    </div>
+                                      </td>
 
-                                    {item.observacoes && (
-                                      <p className="text-[11px] text-slate-400 italic">
-                                        Obs: {item.observacoes}
-                                      </p>
-                                    )}
-                                  </div>
+                                      {/* Qtd Base */}
+                                      <td className="py-2 px-2.5 text-right font-medium text-slate-300 whitespace-nowrap font-mono text-[11px]">
+                                        {item.quantidadeBase}
+                                      </td>
 
-                                  {/* Right: Pricing and Action Buttons */}
-                                  <div className="flex items-center justify-between md:justify-end gap-4 pt-2 md:pt-0 border-t md:border-t-0 border-slate-800">
-                                    <div className="text-right">
-                                      <span className="text-[11px] text-slate-400 block">
-                                        R$ {item.precoUnitario.toFixed(2)} / {item.unidade}
-                                      </span>
-                                      <span className="text-sm sm:text-base font-black text-white">
+                                      {/* Technical Loss Margin % */}
+                                      <td className="py-2 px-2 text-center text-[10px] text-amber-400 whitespace-nowrap font-bold">
+                                        {item.perdaTecnicaPercent > 0 ? `+${item.perdaTecnicaPercent}%` : '—'}
+                                      </td>
+
+                                      {/* Qtd Compra / Final */}
+                                      <td className="py-2 px-2.5 text-right font-black text-amber-300 whitespace-nowrap font-mono text-[11px]">
+                                        {item.quantidadeComPerda}
+                                      </td>
+
+                                      {/* Unit */}
+                                      <td className="py-2 px-2 text-[10px] text-slate-400 whitespace-nowrap font-medium">
+                                        {item.unidade}
+                                      </td>
+
+                                      {/* Unit Price */}
+                                      <td className="py-2 px-3 text-right text-slate-300 whitespace-nowrap font-mono text-[11px]">
+                                        R$ {item.precoUnitario.toFixed(2)}
+                                      </td>
+
+                                      {/* Subtotal */}
+                                      <td className="py-2 px-3 text-right font-black text-white whitespace-nowrap font-mono text-xs">
                                         R$ {item.precoTotal.toFixed(2)}
-                                      </span>
-                                    </div>
+                                      </td>
 
-                                    {/* Action Buttons: Alterar & Excluir */}
-                                    <div className="flex items-center gap-1.5">
-                                      <button
-                                        onClick={() => handleOpenEditItem(item)}
-                                        className="p-2 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-lg transition-colors"
-                                        title="Alterar este item"
+                                      {/* Reference Store / Quotation */}
+                                      <td
+                                        className="py-2 px-3 text-[10px] text-slate-400 truncate max-w-[130px] hidden lg:table-cell"
+                                        title={item.lojaReferencia || 'Não informado'}
                                       >
-                                        <Edit2 className="w-4 h-4" />
-                                      </button>
-                                      <button
-                                        onClick={() => handleDeleteItem(item.id, item.materialNome)}
-                                        className="p-2 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-colors"
-                                        title="Excluir este item do orçamento"
-                                      >
-                                        <Trash2 className="w-4 h-4" />
-                                      </button>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            })}
+                                        {item.lojaReferencia || '—'}
+                                      </td>
+
+                                      {/* Action Buttons: Alterar & Excluir */}
+                                      <td className="py-2 px-2.5 text-center whitespace-nowrap">
+                                        <div className="flex items-center justify-center gap-1">
+                                          <button
+                                            onClick={() => handleOpenEditItem(item)}
+                                            className="p-1 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded transition-colors"
+                                            title="Alterar este item"
+                                          >
+                                            <Edit2 className="w-3.5 h-3.5" />
+                                          </button>
+                                          <button
+                                            onClick={() => handleDeleteItem(item.id, item.materialNome)}
+                                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors"
+                                            title="Excluir este item do orçamento"
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                          </button>
+                                        </div>
+                                      </td>
+                                    </tr>
+                                  );
+                                })}
+                              </tbody>
+                            </table>
                           </div>
                         </div>
                       ))}
@@ -895,7 +1118,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         </div>
       )}
 
-      {/* ALTERNATIVE VIEW: BY ENVIRONMENTS (ROOMS) */}
+      {/* ALTERNATIVE VIEW: BY ENVIRONMENTS (ROOMS) - COMPACT TABLE */}
       {viewMode === 'ambientes' && (
         <div className="space-y-4">
           {project.ambientes.map((ambiente) => {
@@ -909,10 +1132,10 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                 className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm"
               >
                 {/* Room Header row */}
-                <div className="p-4 bg-slate-900 flex items-center justify-between border-b border-slate-800">
+                <div className="p-3.5 bg-slate-900 flex items-center justify-between border-b border-slate-800">
                   <button
                     onClick={() => toggleRoom(ambiente.id)}
-                    className="flex items-center gap-3 text-left group flex-1"
+                    className="flex items-center gap-2.5 text-left group flex-1"
                   >
                     <div className="text-slate-400 group-hover:text-amber-400 transition-colors">
                       {isExpanded ? (
@@ -927,10 +1150,13 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                           {ambiente.nome}
                         </h3>
                         {ambiente.areaPisoM2 > 0 && (
-                          <span className="text-[11px] px-2 py-0.5 rounded bg-slate-800 text-slate-300 font-medium">
+                          <span className="text-[10px] px-2 py-0.2 rounded bg-slate-800 text-slate-300 font-medium">
                             {ambiente.areaPisoM2} m² piso
                           </span>
                         )}
+                        <span className="text-[10px] text-slate-400">
+                          ({roomItems.length} {roomItems.length === 1 ? 'item' : 'itens'})
+                        </span>
                       </div>
                       {ambiente.observacoes && (
                         <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{ambiente.observacoes}</p>
@@ -940,7 +1166,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
 
                   <div className="flex items-center gap-3">
                     <div className="text-right">
-                      <span className="text-xs text-slate-400 block sm:inline mr-1">Subtotal:</span>
+                      <span className="text-[11px] text-slate-400 block sm:inline mr-1">Subtotal:</span>
                       <strong className="text-sm sm:text-base font-extrabold text-emerald-400">
                         R$ {roomTotal.toFixed(2)}
                       </strong>
@@ -948,87 +1174,133 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
 
                     <button
                       onClick={() => handleOpenAddItem()}
-                      className="p-1.5 sm:px-3 sm:py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95"
+                      className="p-1 sm:px-2.5 sm:py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95"
                       title="Adicionar material a este ambiente"
                     >
-                      <Plus className="w-4 h-4" />
-                      <span className="hidden sm:inline">Adicionar Item</span>
+                      <Plus className="w-3.5 h-3.5" />
+                      <span className="hidden sm:inline">+ Item</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Room Items */}
+                {/* Room Items in Table */}
                 {isExpanded && (
-                  <div className="p-3 sm:p-5 bg-slate-950/40">
+                  <div className="p-2 sm:p-4 bg-slate-950/40">
                     {roomItems.length === 0 ? (
                       <div className="py-6 text-center text-slate-500 text-xs space-y-1">
                         <p>Nenhum item adicionado a este ambiente com os filtros atuais.</p>
                       </div>
                     ) : (
-                      <div className="divide-y divide-slate-800 border border-slate-800 rounded-xl overflow-hidden bg-slate-900/60">
-                        {roomItems.map((item) => (
-                          <div
-                            key={item.id}
-                            className="p-3 sm:p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 hover:bg-slate-800/30 transition-colors"
-                          >
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-amber-400">
-                                  {item.classe}
-                                </span>
-                                <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-800 text-slate-300">
-                                  {item.categoria}
-                                </span>
-                                <span className="text-xs font-semibold text-slate-400">
-                                  {item.fabricante}
-                                </span>
-                                {item.comprado && (
-                                  <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-400">
-                                    Comprado
-                                  </span>
-                                )}
-                              </div>
-                              <h4 className="font-bold text-sm text-white">{item.materialNome}</h4>
-                              <div className="flex items-center gap-3 text-xs text-slate-400">
-                                <span>
-                                  Qtd: <strong>{item.quantidadeBase} {item.unidade}</strong>
-                                </span>
-                                <span className="text-amber-300 font-medium">
-                                  +{item.perdaTecnicaPercent}% perda ={' '}
-                                  <strong>{item.quantidadeComPerda} {item.unidade}</strong>
-                                </span>
-                              </div>
-                            </div>
+                      <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/80">
+                        <div className="overflow-x-auto">
+                          <table className="w-full text-left border-collapse text-xs">
+                            <thead>
+                              <tr className="bg-slate-950/70 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
+                                <th className="py-2 px-3 font-extrabold w-28">Status</th>
+                                <th className="py-2 px-3 font-extrabold">Material / Especificação</th>
+                                <th className="py-2 px-2.5 font-extrabold">Grupo / Classe</th>
+                                <th className="py-2 px-2.5 font-extrabold text-right">Qtd Base</th>
+                                <th className="py-2 px-2 font-extrabold text-center">Perda</th>
+                                <th className="py-2 px-2.5 font-extrabold text-right text-amber-300">Qtd Compra</th>
+                                <th className="py-2 px-2 font-extrabold">Unid</th>
+                                <th className="py-2 px-3 font-extrabold text-right">Preço Unit</th>
+                                <th className="py-2 px-3 font-extrabold text-right text-white">Subtotal</th>
+                                <th className="py-2 px-2.5 font-extrabold text-center w-20">Ações</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-800/50">
+                              {roomItems.map((item) => (
+                                <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
+                                  {/* Status */}
+                                  <td className="py-2 px-3 whitespace-nowrap">
+                                    <button
+                                      onClick={() => handleToggleItemComprado(item.id, !!item.comprado)}
+                                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
+                                        item.comprado
+                                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
+                                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-amber-400/50 hover:text-amber-300'
+                                      }`}
+                                    >
+                                      {item.comprado ? (
+                                        <>
+                                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
+                                          <span>Comprado</span>
+                                        </>
+                                      ) : (
+                                        <>
+                                          <Clock className="w-3 h-3 text-slate-400" />
+                                          <span>Planejado</span>
+                                        </>
+                                      )}
+                                    </button>
+                                  </td>
 
-                            <div className="flex items-center justify-between sm:justify-end gap-4 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
-                              <div className="text-right">
-                                <span className="text-[11px] text-slate-400 block">
-                                  R$ {item.precoUnitario.toFixed(2)} / {item.unidade}
-                                </span>
-                                <span className="text-sm font-extrabold text-white">
-                                  R$ {item.precoTotal.toFixed(2)}
-                                </span>
-                              </div>
+                                  {/* Item */}
+                                  <td className="py-2 px-3">
+                                    <div className="font-bold text-white text-xs">{item.materialNome}</div>
+                                    <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
+                                      <span className="text-amber-400 font-semibold">{item.fabricante || 'Genérico'}</span>
+                                      {item.categoria && <span>• {item.categoria}</span>}
+                                    </div>
+                                  </td>
 
-                              <div className="flex items-center gap-1">
-                                <button
-                                  onClick={() => handleOpenEditItem(item)}
-                                  className="p-1.5 text-slate-400 hover:text-amber-300 rounded-lg hover:bg-slate-800"
-                                  title="Alterar este item"
-                                >
-                                  <Edit2 className="w-4 h-4" />
-                                </button>
-                                <button
-                                  onClick={() => handleDeleteItem(item.id, item.materialNome)}
-                                  className="p-1.5 text-slate-500 hover:text-rose-400 rounded-lg hover:bg-slate-800"
-                                  title="Remover do orçamento"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
+                                  {/* Classe */}
+                                  <td className="py-2 px-2.5 whitespace-nowrap text-[10px] font-semibold text-slate-300">
+                                    {item.classe}
+                                  </td>
+
+                                  {/* Qtd Base */}
+                                  <td className="py-2 px-2.5 text-right font-medium text-slate-300 whitespace-nowrap font-mono text-[11px]">
+                                    {item.quantidadeBase}
+                                  </td>
+
+                                  {/* Perda */}
+                                  <td className="py-2 px-2 text-center text-[10px] text-amber-400 whitespace-nowrap font-bold">
+                                    {item.perdaTecnicaPercent > 0 ? `+${item.perdaTecnicaPercent}%` : '—'}
+                                  </td>
+
+                                  {/* Qtd Compra */}
+                                  <td className="py-2 px-2.5 text-right font-black text-amber-300 whitespace-nowrap font-mono text-[11px]">
+                                    {item.quantidadeComPerda}
+                                  </td>
+
+                                  {/* Unidade */}
+                                  <td className="py-2 px-2 text-[10px] text-slate-400 whitespace-nowrap font-medium">
+                                    {item.unidade}
+                                  </td>
+
+                                  {/* Preço Unit */}
+                                  <td className="py-2 px-3 text-right text-slate-300 whitespace-nowrap font-mono text-[11px]">
+                                    R$ {item.precoUnitario.toFixed(2)}
+                                  </td>
+
+                                  {/* Subtotal */}
+                                  <td className="py-2 px-3 text-right font-black text-white whitespace-nowrap font-mono text-xs">
+                                    R$ {item.precoTotal.toFixed(2)}
+                                  </td>
+
+                                  {/* Ações */}
+                                  <td className="py-2 px-2.5 text-center whitespace-nowrap">
+                                    <div className="flex items-center justify-center gap-1">
+                                      <button
+                                        onClick={() => handleOpenEditItem(item)}
+                                        className="p-1 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded transition-colors"
+                                      >
+                                        <Edit2 className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleDeleteItem(item.id, item.materialNome)}
+                                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors"
+                                      >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
                       </div>
                     )}
                   </div>
