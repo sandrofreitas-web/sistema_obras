@@ -10,27 +10,44 @@ O produto nasce para resolver a dispersão de dados na construção civil, conec
 
 ```mermaid
 graph LR
-    A[📷 Captura em Loja<br/>OCR Multimodal] --> B[🏷️ Catálogo Parametrizado<br/>Fator Embalagem & Preços]
-    B --> C[📊 Simulação de Cenários<br/>Standard vs Premium]
-    C --> D[💰 Pedidos & Compras<br/>À Vista & Parcelado]
-    D --> E[📋 Diário de Obra RDO<br/>Realizado vs Planejado]
+    A[📷 Captura em Loja<br/>OCR Multimodal] --> B[🏷️ Catálogo Homologado<br/>Fator Embalagem & Preços]
+    B --> C[📊 Detalhamento em Tabela<br/>Grupos, Categorias & Perda %]
+    C --> D[📋 Lista de Cotação & Compras<br/>Status Planejado x Comprado]
+    D --> E[💰 Execução Financeira<br/>À Vista & Parcelado]
+    E --> F[📋 Diário de Obra RDO<br/>Avanço Físico 5 Semanas]
 ```
 
 1. **Captura em Loja Física:** Fotografar etiquetas em gôndolas e caixas de materiais, extraindo marca, SKU, preço à vista/prazo e unidade com auxílio de IA e confirmação humana.
-2. **Catalogação Parametrizada:** Histórico de preços por loja e cálculo de fator de embalagem (ex: conversão de m² de projeto para caixas fechadas).
-3. **Orçamento e Cenários:** Definição de ambientes com metragens e simulações comparativas para tomada de decisão institucional.
-4. **Execução Financeira:** Controle de compras com comprovantes fiscais e gestão de fluxo de caixa (compras à vista vs parceladas no cartão em até 6x).
-5. **Acompanhamento Físico (RDO):** Cronograma de execução, checklist de etapas e diário de obra com registro fotográfico.
+2. **Catalogação Parametrizada:** Histórico de preços por loja e cálculo de fator de embalagem (conversão de m² de projeto para caixas fechadas, kg para sacos, etc.).
+3. **Detalhamento do Projeto em Tabela:** Estruturação hierárquica por Grupos (Classes) e Categorias, com visual compacto em tabela de engenharia, cálculo automático de perda técnica (+5% a +15%) e subtotais dinâmicos.
+4. **Gestão de Aquisições e Cotações:** Acompanhamento do status de compra (Planejado vs Comprado com 1 clique), métricas de desembolso pendente e exportação de **Lista de Cotação (CSV)** para levar a depósitos.
+5. **Execução Financeira:** Controle de compras com comprovantes fiscais e gestão de fluxo de caixa (à vista vs parcelado no cartão).
+6. **Acompanhamento Físico (RDO):** Cronograma de execução sequencial e diário de obra com registro fotográfico.
 
 ---
 
 ## 🏛️ Projeto Piloto em Produção: Obra ICENV 2026
 
-O desenvolvimento deste software está sendo validado em um ambiente de obra real:
-* **Projeto:** Reforma do Banheiro da Casa Pastoral e Bloco Masculino da Igreja (ICENV).
-* **Data Oficial de Início:** **13/10/2026** (Duração estimada: 5 semanas).
-* **Orçamento Teto Estimado:** **R$ 53.825,00** (Mão de Obra: R$ 32.500,00 | Materiais: R$ 21.325,00).
-* **Pasta de Documentos & Dados da Obra Piloto:** `H:\Meu Drive\01. ICENV\Obras_2026`
+O sistema opera com o caso real da **Igreja Cristã Evangélica Nova Vida**, estruturado em duas fases sequenciais:
+* **Fase 1 (Em Execução Inicial — Início: 13/10/2026):**
+  * `1ª Fase: Banheiro Casa Pastoral — Obra ICENV 2026`
+  * Mão de Obra Wagner: R$ 17.000,00 | Materiais: R$ 8.500,00 (Área: 3,3 m² piso / 23 m² paredes).
+  * Prazo: 3 semanas (13/10 a 02/11/2026).
+* **Fase 2 (Sequencial — Início Previsto: 03/11/2026):**
+  * `2ª Fase: Banheiro Masculino Igreja — Obra ICENV 2026`
+  * Mão de Obra Wagner: R$ 15.500,00 | Materiais: R$ 12.825,00 (Área: 10 m² piso / 37 m² paredes).
+  * Prazo: 3 semanas (03/11 a 24/11/2026).
+* **Pasta Oficial de Dados:** `H:\Meu Drive\01. ICENV\Obras_2026`
+* **Orçamento Teto Consolidado:** **R$ 53.825,00** (Mão de Obra: R$ 32.500,00 | Materiais: R$ 21.325,00).
+
+---
+
+## 📱 Acesso Mobile (PWA no Celular)
+
+O aplicativo pode ser acessado diretamente no smartphone via navegador ou instalado como PWA:
+* **Link Seguro PWA (Cloudflare Tunnel):**  
+  👉 **`https://sensors-catch-corporate-reprints.trycloudflare.com`**
+* **Acesso na Rede Local (Wi-Fi):** `http://<IP-do-computador>:3080`
 
 ---
 
@@ -52,6 +69,11 @@ O desenvolvimento deste software está sendo validado em um ambiente de obra rea
 * [x] **v1.2:** Implementação do **Módulo 1 (Captura & Cadastro Inteligente)**:
   - PWA Mobile-First instalável no smartphone para uso no corredor de lojas e depósitos.
   - OCR Multimodal assistido com extração automática de marca, SKU, preço à vista e a prazo.
-  - Conversor dinâmico de fator de embalagem (m² para caixas fechadas, kg para sacos, litros para latas).
-  - Endpoints REST para catálogo unificado (`/materiais`), análise OCR (`/captura/analisar`) e gravação atômica (`/captura/salvar`).
-* [ ] **v2.0:** Módulo de Orçamentos por Ambiente e Cenários (Standard vs Premium) para o início da obra em 13/10/2026.
+  - Conversor dinâmico de fator de embalagem.
+* [x] **v2.0:** Módulo de **Detalhamento Executivo de Projetos**:
+  - Separação da obra em duas fases sequenciais com alternância rápida (Casa Pastoral e Banheiro Masculino).
+  - Tabela compacta de quantitativos por grupos e categorias com cálculo de perda técnica (+5% a +15%).
+  - CRUD completo de itens integrado à base homologada de materiais.
+  - Painel de evolução das aquisições com alternância de status Planejado x Comprado em 1 clique.
+  - Exportação de Lista de Cotação para lojas (CSV) e Orçamento Executivo (CSV/PDF).
+* [ ] **v3.0:** Módulo 4 (Controle de Execução Financeira / Notas Fiscais) e Módulo 5 (RDO com fotos datadas).
