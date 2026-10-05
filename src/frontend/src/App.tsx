@@ -170,6 +170,8 @@ export default function App() {
           {currentTab === 'orcamento' && (
             <BudgetScreen
               project={activeProject}
+              materials={materials}
+              taxonomia={taxonomia}
               onProjectUpdated={handleProjectUpdated}
               onOpenCatalog={() => setCurrentTab('catalogo')}
               onOpenPrintBudget={() => setIsPrintBudgetModalOpen(true)}

@@ -90,7 +90,7 @@ Taxonomia padronizada compatível com a `Lista_Mestra_de_Materiais.md`:
 
 ---
 
-## 6. Módulo 3 — Montagem de Projeto, Ambientes e Cenários
+## 6. Módulo 3 — Detalhamento Executivo do Projeto por Grupos e Categorias
 
 ### 6.1 Parametrização para a Obra ICENV 2026
 * **Projeto Ativo:** `Obras ICENV 2026`
@@ -99,13 +99,13 @@ Taxonomia padronizada compatível com a `Lista_Mestra_de_Materiais.md`:
   * **Ambiente 2:** `Banheiro Masculino Igreja` (~10 m² piso | 37 m² paredes revestidas | divisórias granito | Mão de Obra: R$ 15.500,00)
   * **Ambiente 3:** `Área Comum / Caçambas & Infra` (4 caçambas estacionárias 5m³)
 
-### 6.2 Recursos de Cálculo e Cenários
-- **Cálculo com Perda Técnica:** Adição automática de margem de corte e quebra (+10% pisos retos, +15% diagonal).
-- **Cálculo de Caixas Fechadas:** Quantidade necessária dividida pela metragem por caixa, arredondando para cima.
-- **Simulação A x B (Cenários):**
-  - *Cenário Standard:* Itens de melhor custo-benefício (Celite, porcelanato comercial retificado, torneiras metálicas tradicionais).
-  - *Cenário Premium:* Itens de maior durabilidade institucional (Deca antivandalismo, porcelanato esmaltado alto tráfego, torneiras com sensor/pressmático).
-- **Exportação:** Geração de relatórios em PDF e atualização da tabela Markdown de Suprimentos.
+### 6.2 Estrutura de Detalhamento e Gestão de Itens
+- **Eliminação da Simulação Hipotética:** A tela de projetos foca diretamente no **Detalhamento Executivo**, estruturado por **Grupos (Classes)** e **Categorias**, espelhando a Lista Mestra de Materiais.
+- **CRUD Completo de Itens:**
+  - **Inclusão:** Conexão direta com a base homologada de materiais (catálogo), preenchendo automaticamente fabricante, preços e unidades, ou cadastro sob demanda.
+  - **Alteração:** Edição de quantitativo base, percentual de perda técnica (+5% geral, +10% a +15% para cortes de revestimentos), ambiente de aplicação e preço unitário com recálculo instantâneo.
+  - **Exclusão:** Remoção segura de itens com atualização em tempo real dos subtotais e da reserva de contingência.
+- **Exportação:** Geração de relatórios executivos em PDF para canteiro e exportação de planilha detalhada em formato CSV compatível com Excel.
 
 ---
 

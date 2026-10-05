@@ -154,27 +154,6 @@ export const AddItemToProjectModal: React.FC<AddItemToProjectModalProps> = ({
             </select>
           </div>
 
-          {/* Select Scenario (Simulação Comparativa) */}
-          <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">
-              Cenário de Simulação *
-            </label>
-            <select
-              value={selectedCenarioId}
-              onChange={(e) => setSelectedCenarioId(e.target.value)}
-              className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white outline-none focus:border-amber-400"
-            >
-              {activeProject.cenarios.map((cen) => (
-                <option key={cen.id} value={cen.id}>
-                  {cen.nome}
-                </option>
-              ))}
-            </select>
-            <p className="text-[11px] text-slate-400 mt-0.5">
-              Você pode adicionar em um cenário para simular custo econômico vs premium.
-            </p>
-          </div>
-
           {/* Quantity and Technical Waste (% Perda) */}
           <div className="grid grid-cols-2 gap-3 bg-slate-800/40 p-3 rounded-xl border border-slate-700/60">
             <div>

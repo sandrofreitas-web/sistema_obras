@@ -34,7 +34,7 @@ export interface Material {
   coberturaPorEmbalagem?: number; // m² por caixa ou m² por galão
   lojaAtual: string;
   fotoPrincipal?: string;
-  fotos: string[];
+  fotos?: string[];
   especificacoes?: Record<string, string>;
   observacoes?: string;
   status: 'catalogo' | 'selecionado';
