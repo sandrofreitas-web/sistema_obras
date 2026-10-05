@@ -1,5 +1,13 @@
 import { Material, Loja, Projeto, TaxonomiaClasse, ItemFilaOffline, PrecoCaptura, CompraReal } from '../types';
-import { DEFAULT_TAXONOMIA, INITIAL_LOJAS, INITIAL_MATERIALS, INITIAL_PROJECT } from '../data/initialData';
+import {
+  DEFAULT_TAXONOMIA,
+  INITIAL_LOJAS,
+  INITIAL_MATERIALS,
+  INITIAL_PROJECT,
+  INITIAL_PROJECTS,
+  INITIAL_PROJECT_PASTORAL,
+  INITIAL_PROJECT_MASCULINO,
+} from '../data/initialData';
 
 const STORAGE_KEYS = {
   MATERIALS: 'obracerta_materials_icenv_2026',
@@ -33,13 +41,14 @@ function safeSave<T>(key: string, value: T): void {
 export const storageService = {
   /**
    * Reseta o banco local para os dados oficiais do Projeto Piloto ICENV 2026
+   * Separado em duas fases sequenciais: 1ª Fase Casa Pastoral e 2ª Fase Banheiro Masculino
    */
   resetToPilotData(): void {
     safeSave(STORAGE_KEYS.MATERIALS, INITIAL_MATERIALS);
     safeSave(STORAGE_KEYS.TAXONOMIA, DEFAULT_TAXONOMIA);
     safeSave(STORAGE_KEYS.LOJAS, INITIAL_LOJAS);
-    safeSave(STORAGE_KEYS.PROJECTS, [INITIAL_PROJECT]);
-    safeSave(STORAGE_KEYS.ACTIVE_PROJECT_ID, INITIAL_PROJECT.id);
+    safeSave(STORAGE_KEYS.PROJECTS, INITIAL_PROJECTS);
+    safeSave(STORAGE_KEYS.ACTIVE_PROJECT_ID, INITIAL_PROJECT_PASTORAL.id);
     safeSave(STORAGE_KEYS.OFFLINE_QUEUE, []);
   },
 
@@ -182,9 +191,13 @@ export const storageService = {
   // === Projetos & Orçamentos ===
   getProjects(): Projeto[] {
     const list = safeParse<Projeto[]>(STORAGE_KEYS.PROJECTS, []);
-    if (list.length === 0) {
-      safeSave(STORAGE_KEYS.PROJECTS, [INITIAL_PROJECT]);
-      return [INITIAL_PROJECT];
+    
+    // Auto-migração: se a lista estiver vazia ou contiver apenas o projeto legado unificado
+    const hasLegacyUnified = list.some((p) => p.id === 'proj-icenv-2026');
+    if (list.length === 0 || hasLegacyUnified) {
+      safeSave(STORAGE_KEYS.PROJECTS, INITIAL_PROJECTS);
+      safeSave(STORAGE_KEYS.ACTIVE_PROJECT_ID, INITIAL_PROJECT_PASTORAL.id);
+      return INITIAL_PROJECTS;
     }
     return list;
   },
@@ -208,9 +221,9 @@ export const storageService = {
 
   getActiveProjectId(): string {
     const current = localStorage.getItem(STORAGE_KEYS.ACTIVE_PROJECT_ID);
-    if (current) return current;
+    if (current && current !== 'proj-icenv-2026') return current;
     const projects = this.getProjects();
-    const fallbackId = projects[0]?.id || 'proj-1';
+    const fallbackId = projects[0]?.id || INITIAL_PROJECT_PASTORAL.id;
     localStorage.setItem(STORAGE_KEYS.ACTIVE_PROJECT_ID, fallbackId);
     return fallbackId;
   },

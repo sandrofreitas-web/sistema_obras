@@ -17,36 +17,36 @@ Este documento registra os parâmetros da obra real utilizada como piloto para t
 
 ---
 
-## 2. Detalhamento dos Ambientes e Metragens
+## 2. Separação dos Projetos em Fases Sequenciais
 
-### Ambiente 1: Banheiro da Casa Pastoral
+### Fase 1: Banheiro da Casa Pastoral (Em Execução — Início: 13/10/2026)
+* **ID do Projeto:** `proj-icenv-pastoral`
 * **Dimensões:** 3,00m (comprimento) x 1,10m (largura) x 2,80m (altura)
-* **Área de Piso:** ~3,3 m²
-* **Área de Paredes Revestidas:** ~23,0 m²
-* **Mão de Obra Alocada:** R$ 17.000,00 (inclui demolição de beiral externo e regularização de janelas de dormitórios)
-* **Materiais Estimados:** R$ 8.500,00
+* **Área de Piso:** ~3,3 m² | **Área de Paredes:** ~23,0 m²
+* **Mão de Obra Alocada:** R$ 17.000,00 (inclui demolição de beiral externo no quintal, regularização de janelas de dormitórios e alvenaria)
+* **Materiais Estimados:** R$ 8.500,00 | Prazo: 3 semanas (13/10 a 02/11/2026)
+* **Caçambas:** 2 caçambas estacionárias 5m³ dedicadas
 
-### Ambiente 2: Banheiro Masculino da Igreja
+### Fase 2: Banheiro Masculino da Igreja (Sequencial — Início: 03/11/2026)
+* **ID do Projeto:** `proj-icenv-masculino`
 * **Dimensões:** Bloco coletivo com boxes e mictórios
-* **Área de Piso:** ~10,0 m²
-* **Área de Paredes Revestidas:** ~37,0 m²
-* **Mão de Obra Alocada:** R$ 15.500,00
-* **Materiais Estimados:** R$ 9.800,00 (inclui divisórias de mármore/granito sob medida)
-
-### Infraestrutura Comum e Descarte
-* **Caçambas e Reserva Técnica:** R$ 3.000,00 (4 caçambas de 5 m³ previstas)
+* **Área de Piso:** ~10,0 m² | **Área de Paredes:** ~37,0 m²
+* **Mão de Obra Alocada:** R$ 15.500,00 (revisão hidráulica/elétrica completa, 2 bacias, 2 mictórios, divisórias de granito)
+* **Materiais Estimados:** R$ 12.825,00 | Prazo: 3 semanas (03/11 a 24/11/2026)
+* **Caçambas:** 2 caçambas estacionárias 5m³ dedicadas
 
 ---
 
-## 3. Cronograma Oficial de 5 Semanas (Início: 13/10/2026)
+## 3. Cronograma Sequencial Integrado
 
-| Semana | Período | Frentes Principais de Trabalho |
-| :---: | :---: | :--- |
-| **S1** | 13/10 a 18/10 | Mobilização, entrega de caçambas, demolição de revestimentos antigos e remoção de beiral externo. |
-| **S2** | 19/10 a 25/10 | Abertura de novos vãos, execução da nova rede de água fria/esgoto e eletrodutos. |
-| **S3** | 26/10 a 01/11 | Regularização de contrapisos, teste de estanqueidade 72h, emboço e forro de gesso. |
-| **S4** | 02/11 a 08/11 | Assentamento de porcelanatos e azulejos, montagem das divisórias em granito nos boxes. |
-| **S5** | 09/11 a 15/11 | Instalação de louças, torneiras, registros, luminárias LED, pintura geral e limpeza fina. |
+| Fase / Semana | Período | Frente de Trabalho | Status |
+| :---: | :---: | :--- | :---: |
+| **Fase 1 / S1** | 13/10 a 19/10 | Demolição do banheiro pastoral, remoção de beiral externo no quintal, janelas e caçambas | Em Execução |
+| **Fase 1 / S2** | 20/10 a 26/10 | Nova rede de água fria/esgoto, eletrodutos, abertura de vão para nova janela e alvenaria | Planejado |
+| **Fase 1 / S3** | 27/10 a 02/11 | Contrapiso, impermeabilização 72h, porcelanato, azulejo, forro gesso, louças e entrega Casa Pastoral | Planejado |
+| **Fase 2 / S1** | 03/11 a 09/11 | Desativação, caçambas e demolição total de revestimentos e divisórias do banheiro masculino | Sequencial |
+| **Fase 2 / S2** | 10/11 a 16/11 | Revisão hidráulica/elétrica, pontos de esgoto para 2 bacias e 2 mictórios, impermeabilização | Sequencial |
+| **Fase 2 / S3** | 17/11 a 24/11 | Assentamento de porcelanato, forro gesso, montagem de divisórias de granito, louças e entrega final | Sequencial |
 
 ---
 

@@ -92,12 +92,18 @@ Taxonomia padronizada compatível com a `Lista_Mestra_de_Materiais.md`:
 
 ## 6. Módulo 3 — Detalhamento Executivo do Projeto por Grupos e Categorias
 
-### 6.1 Parametrização para a Obra ICENV 2026
-* **Projeto Ativo:** `Obras ICENV 2026`
+### 6.1 Parametrização para a Obra ICENV 2026 (Execução Sequencial em 2 Fases)
 * **Pasta Oficial de Dados da Obra Piloto:** `H:\Meu Drive\01. ICENV\Obras_2026`
-  * **Ambiente 1:** `Banheiro Casa Pastoral` (3,3 m² piso | 23 m² paredes revestidas | Mão de Obra: R$ 17.000,00)
-  * **Ambiente 2:** `Banheiro Masculino Igreja` (~10 m² piso | 37 m² paredes revestidas | divisórias granito | Mão de Obra: R$ 15.500,00)
-  * **Ambiente 3:** `Área Comum / Caçambas & Infra` (4 caçambas estacionárias 5m³)
+* **Fase 1 (Projeto Inicial em Execução — Início: 13/10/2026):**
+  * **Projeto:** `1ª Fase: Banheiro Casa Pastoral — Obra ICENV 2026` (`proj-icenv-pastoral`)
+  * **Ambiente:** `Banheiro Casa Pastoral` (3,3 m² piso | 23 m² paredes revestidas | 7,4 m perímetro)
+  * **Mão de Obra Wagner:** R$ 17.000,00 (inclui demolição de beiral externo, remoção de janelas e alvenaria)
+  * **Materiais Estimados:** R$ 8.500,00 | Prazo: 3 semanas (13/10 a 02/11/2026)
+* **Fase 2 (Projeto Sequencial — Início Previsto: 03/11/2026):**
+  * **Projeto:** `2ª Fase: Banheiro Masculino Igreja — Obra ICENV 2026` (`proj-icenv-masculino`)
+  * **Ambiente:** `Banheiro Masculino Igreja` (~10 m² piso | 37 m² paredes revestidas | 13 m perímetro)
+  * **Mão de Obra Wagner:** R$ 15.500,00 (revisão hidráulica/elétrica completa, 2 bacias, 2 mictórios, divisórias granito)
+  * **Materiais Estimados:** R$ 12.825,00 | Prazo: 3 semanas (03/11 a 24/11/2026)
 
 ### 6.2 Estrutura de Detalhamento e Gestão de Itens
 - **Eliminação da Simulação Hipotética:** A tela de projetos foca diretamente no **Detalhamento Executivo**, estruturado por **Grupos (Classes)** e **Categorias**, espelhando a Lista Mestra de Materiais.

@@ -170,6 +170,8 @@ export default function App() {
           {currentTab === 'orcamento' && (
             <BudgetScreen
               project={activeProject}
+              projects={projects}
+              onSelectProject={handleSelectProject}
               materials={materials}
               taxonomia={taxonomia}
               onProjectUpdated={handleProjectUpdated}

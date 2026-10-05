@@ -32,6 +32,8 @@ import { ProjectItemModal } from './ProjectItemModal';
 
 interface BudgetScreenProps {
   project: Projeto | null;
+  projects?: Projeto[];
+  onSelectProject?: (id: string) => void;
   materials: Material[];
   taxonomia: TaxonomiaClasse[];
   onProjectUpdated: (project: Projeto) => void;
@@ -57,6 +59,8 @@ const getGroupIcon = (classeNome: string) => {
 
 export const BudgetScreen: React.FC<BudgetScreenProps> = ({
   project,
+  projects,
+  onSelectProject,
   materials,
   taxonomia,
   onProjectUpdated,
@@ -408,6 +412,46 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
 
   return (
     <div className="space-y-6 pb-20">
+      {/* Sequential Phase Switcher Bar */}
+      {projects && projects.length > 1 && onSelectProject && (
+        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
+            <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5 mr-1 flex-shrink-0">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Execução Sequencial:
+            </span>
+            {projects.map((p, idx) => {
+              const isActive = p.id === project.id;
+              const isPastoral = p.id.includes('pastoral') || p.nome.includes('Pastoral');
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => onSelectProject(p.id)}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                    isActive
+                      ? 'bg-amber-400 text-slate-950 shadow-md font-black scale-[1.02]'
+                      : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700/60'
+                  }`}
+                >
+                  <span className={`w-2 h-2 rounded-full ${isPastoral ? 'bg-emerald-500' : 'bg-blue-400'}`} />
+                  <span>{idx + 1}ª Fase: {isPastoral ? 'Banheiro Casa Pastoral' : 'Banheiro Masculino'}</span>
+                  <span
+                    className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                      isActive ? 'bg-slate-950/20 text-slate-900' : 'bg-slate-900 text-slate-400'
+                    }`}
+                  >
+                    {isPastoral ? 'Fase Inicial (Em Andamento)' : 'Fase 2 (Sequencial)'}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          <span className="text-[11px] text-slate-400 font-medium">
+            🎯 Início: <strong>13/10/2026</strong> pela Casa Pastoral
+          </span>
+        </div>
+      )}
+
       {/* Top Project Banner */}
       <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
