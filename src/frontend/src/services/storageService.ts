@@ -2,12 +2,12 @@ import { Material, Loja, Projeto, TaxonomiaClasse, ItemFilaOffline, PrecoCaptura
 import { DEFAULT_TAXONOMIA, INITIAL_LOJAS, INITIAL_MATERIALS, INITIAL_PROJECT } from '../data/initialData';
 
 const STORAGE_KEYS = {
-  MATERIALS: 'obracerta_materials_v1',
-  TAXONOMIA: 'obracerta_taxonomia_v1',
-  LOJAS: 'obracerta_lojas_v1',
-  PROJECTS: 'obracerta_projects_v1',
-  ACTIVE_PROJECT_ID: 'obracerta_active_project_id_v1',
-  OFFLINE_QUEUE: 'obracerta_offline_queue_v1',
+  MATERIALS: 'obracerta_materials_icenv_2026',
+  TAXONOMIA: 'obracerta_taxonomia_icenv_2026',
+  LOJAS: 'obracerta_lojas_icenv_2026',
+  PROJECTS: 'obracerta_projects_icenv_2026',
+  ACTIVE_PROJECT_ID: 'obracerta_active_project_id_icenv_2026',
+  OFFLINE_QUEUE: 'obracerta_offline_queue_icenv_2026',
 };
 
 // Safe JSON parser
@@ -31,6 +31,18 @@ function safeSave<T>(key: string, value: T): void {
 }
 
 export const storageService = {
+  /**
+   * Reseta o banco local para os dados oficiais do Projeto Piloto ICENV 2026
+   */
+  resetToPilotData(): void {
+    safeSave(STORAGE_KEYS.MATERIALS, INITIAL_MATERIALS);
+    safeSave(STORAGE_KEYS.TAXONOMIA, DEFAULT_TAXONOMIA);
+    safeSave(STORAGE_KEYS.LOJAS, INITIAL_LOJAS);
+    safeSave(STORAGE_KEYS.PROJECTS, [INITIAL_PROJECT]);
+    safeSave(STORAGE_KEYS.ACTIVE_PROJECT_ID, INITIAL_PROJECT.id);
+    safeSave(STORAGE_KEYS.OFFLINE_QUEUE, []);
+  },
+
   // === Materiais ===
   getMaterials(): Material[] {
     const materials = safeParse<Material[]>(STORAGE_KEYS.MATERIALS, []);

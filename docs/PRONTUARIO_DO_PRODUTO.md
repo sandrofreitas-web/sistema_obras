@@ -94,9 +94,10 @@ Taxonomia padronizada compatível com a `Lista_Mestra_de_Materiais.md`:
 
 ### 6.1 Parametrização para a Obra ICENV 2026
 * **Projeto Ativo:** `Obras ICENV 2026`
-  * **Ambiente 1:** `Banheiro Casa Pastoral` (3,3 m² piso | 23 m² paredes revestidas)
-  * **Ambiente 2:** `Banheiro Masculino Igreja` (~10 m² piso | 37 m² paredes revestidas | divisórias granito)
-  * **Ambiente 3:** `Área Comum / Caçambas & Infra`
+* **Pasta Oficial de Dados da Obra Piloto:** `H:\Meu Drive\01. ICENV\Obras_2026`
+  * **Ambiente 1:** `Banheiro Casa Pastoral` (3,3 m² piso | 23 m² paredes revestidas | Mão de Obra: R$ 17.000,00)
+  * **Ambiente 2:** `Banheiro Masculino Igreja` (~10 m² piso | 37 m² paredes revestidas | divisórias granito | Mão de Obra: R$ 15.500,00)
+  * **Ambiente 3:** `Área Comum / Caçambas & Infra` (4 caçambas estacionárias 5m³)
 
 ### 6.2 Recursos de Cálculo e Cenários
 - **Cálculo com Perda Técnica:** Adição automática de margem de corte e quebra (+10% pisos retos, +15% diagonal).

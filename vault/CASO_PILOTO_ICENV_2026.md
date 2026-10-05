@@ -1,4 +1,4 @@
-﻿# 🎯 Caso Piloto em Produção: Obra ICENV 2026
+# 🎯 Caso Piloto em Produção: Obra ICENV 2026
 
 Este documento registra os parâmetros da obra real utilizada como piloto para testes, validação de regras de negócio e calibração de usabilidade do **Sistema de Obras**.
 
@@ -9,10 +9,11 @@ Este documento registra os parâmetros da obra real utilizada como piloto para t
 * **Entidade:** Igreja Cristã Evangélica Nova Vida (ICENV)
 * **Objeto:** Reforma Completa do Banheiro da Casa Pastoral + Bloco de Banheiros/Vestiário Masculino da Igreja.
 * **Data Oficial de Início:** **13/10/2026**
-* **Prazo Estimado:** 5 semanas (Término previsto: 15/11/2026)
-* **Orçamento Teto Consolidado:** **R$ 53.800,00**
+* **Prazo Estimado:** 5 semanas (Término previsto: 17/11/2026)
+* **Pasta de Documentos & Dados da Obra:** `H:\Meu Drive\01. ICENV\Obras_2026`
+* **Orçamento Teto Consolidado:** **R$ 53.825,00**
   * Mão de Obra Contratada: R$ 32.500,00 (60,4%)
-  * Materiais Estimados: R$ 21.300,00 (39,6%)
+  * Materiais Estimados: R$ 21.325,00 (39,6%)
 
 ---
 

@@ -29,8 +29,8 @@ graph LR
 O desenvolvimento deste software está sendo validado em um ambiente de obra real:
 * **Projeto:** Reforma do Banheiro da Casa Pastoral e Bloco Masculino da Igreja (ICENV).
 * **Data Oficial de Início:** **13/10/2026** (Duração estimada: 5 semanas).
-* **Orçamento Teto Estimado:** **R$ 53.800,00** (Mão de Obra: R$ 32.500,00 | Materiais: R$ 21.300,00).
-* **Repositório da Obra:** `G:\Meu Drive\02 Igreja\02. Projetos\Obras ICENV\Obras_2026`
+* **Orçamento Teto Estimado:** **R$ 53.825,00** (Mão de Obra: R$ 32.500,00 | Materiais: R$ 21.325,00).
+* **Pasta de Documentos & Dados da Obra Piloto:** `H:\Meu Drive\01. ICENV\Obras_2026`
 
 ---
 

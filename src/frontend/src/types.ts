@@ -159,6 +159,9 @@ export interface Projeto {
   nome: string;
   descricao: string;
   cliente?: string;
+  pastaDocumentos?: string;
+  orcamentoMaoObra?: number;
+  orcamentoMateriais?: number;
   areaTotalM2: number;
   dataInicio: string;
   dataPrevisao: string;

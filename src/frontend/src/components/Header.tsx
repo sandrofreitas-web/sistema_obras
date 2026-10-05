@@ -21,6 +21,7 @@ interface HeaderProps {
   onOpenOfflineQueue: () => void;
   isMobileViewMode: boolean;
   onToggleMobileViewMode: () => void;
+  onResetToPilot?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -33,6 +34,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenOfflineQueue,
   isMobileViewMode,
   onToggleMobileViewMode,
+  onResetToPilot,
 }) => {
   const pendingOfflineCount = offlineQueue.filter((q) => q.status === 'pendente' || q.status === 'erro').length;
 
@@ -50,11 +52,17 @@ export const Header: React.FC<HeaderProps> = ({
                 Obra<span className="text-amber-400">Certa</span>
               </span>
               <span className="hidden md:inline-block text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                Pro
+                Piloto ICENV
               </span>
             </div>
             <p className="hidden sm:block text-[11px] text-slate-400 truncate">
-              Materiais, Orçamentos & Custos de Obra
+              {activeProject?.pastaDocumentos ? (
+                <span title={activeProject.pastaDocumentos} className="text-amber-400/90 font-mono text-[10px]">
+                  📁 {activeProject.pastaDocumentos}
+                </span>
+              ) : (
+                'Materiais, Orçamentos & Custos de Obra'
+              )}
             </p>
           </div>
         </div>
@@ -77,7 +85,7 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 {projects.map((p) => (
                   <option key={p.id} value={p.id} className="bg-slate-900 text-slate-200">
-                    {p.nome} ({p.areaTotalM2}m²)
+                    {p.nome}
                   </option>
                 ))}
                 <option value="__new__" className="bg-slate-900 text-amber-400 font-semibold">
@@ -86,6 +94,15 @@ export const Header: React.FC<HeaderProps> = ({
               </select>
             </div>
           </div>
+          {onResetToPilot && (
+            <button
+              onClick={onResetToPilot}
+              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-400 border border-slate-700 transition-colors"
+              title="Recarregar Dados Oficiais do Projeto Piloto ICENV 2026"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          )}
         </div>
 
         {/* Right action badges */}

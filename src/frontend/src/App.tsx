@@ -110,6 +110,17 @@ export default function App() {
     setCurrentTab('catalogo');
   };
 
+  const handleResetToPilot = () => {
+    if (
+      window.confirm(
+        'Deseja recarregar as informações oficiais do Projeto Piloto ICENV 2026? As 28 especificações da Lista Mestra e o cronograma de 5 semanas serão recarregados com dados limpos.'
+      )
+    ) {
+      storageService.resetToPilotData();
+      loadAllData();
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950">
       {/* Top Header */}
@@ -123,6 +134,7 @@ export default function App() {
         onOpenOfflineQueue={() => setIsOfflineQueueModalOpen(true)}
         isMobileViewMode={isMobileViewMode}
         onToggleMobileViewMode={() => setIsMobileViewMode(!isMobileViewMode)}
+        onResetToPilot={handleResetToPilot}
       />
 
       {/* Navigation Bars (Top Desktop bar + Bottom Mobile sticky bar) */}
