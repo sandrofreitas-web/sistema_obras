@@ -90,11 +90,12 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('todos');
   const [selectedAmbienteFilter, setSelectedAmbienteFilter] = useState<string>('todos');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<'todos' | 'planejado' | 'comprado'>('todos');
-  const [viewMode, setViewMode] = useState<'grupos' | 'ambientes'>('grupos');
+  // Iniciar carga da página pela vista de Ambiente por padrão
+  const [viewMode, setViewMode] = useState<'ambientes' | 'grupos'>('ambientes');
 
-  // Accordion Expanded State for Groups
+  // Accordion Expanded State for Groups (iniciam recolhidos por padrão)
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  // Accordion Expanded State for Rooms
+  // Accordion Expanded State for Rooms (iniciam expandidos por padrão)
   const [expandedRooms, setExpandedRooms] = useState<Record<string, boolean>>({});
 
   // Item Modal State (Create / Edit)
@@ -103,11 +104,11 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
   const [itemToEdit, setItemToEdit] = useState<ItemProjeto | null>(null);
   const [preselectedGroupForNewItem, setPreselectedGroupForNewItem] = useState<string>('');
 
-  // Toggle group accordion
+  // Toggle group accordion (iniciam recolhidos por padrão)
   const toggleGroup = (grupoNome: string) => {
     setExpandedGroups((prev) => ({
       ...prev,
-      [grupoNome]: prev[grupoNome] === undefined ? false : !prev[grupoNome],
+      [grupoNome]: !prev[grupoNome],
     }));
   };
 
@@ -812,27 +813,27 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               <option value="comprado">Apenas Já Comprados</option>
             </select>
 
-            {/* View Mode Toggle: Grupos vs Ambientes */}
-            <div className="flex items-center bg-slate-950 border border-slate-700 rounded-xl p-0.5">
-              <button
-                onClick={() => setViewMode('grupos')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                  viewMode === 'grupos'
-                    ? 'bg-amber-400 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Por Grupos
-              </button>
+            {/* View Mode Toggle: Ambientes (Principal) vs Grupos (Secundário) */}
+            <div className="flex items-center bg-slate-950 border border-slate-700/80 rounded-lg p-0.5">
               <button
                 onClick={() => setViewMode('ambientes')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
                   viewMode === 'ambientes'
                     ? 'bg-amber-400 text-slate-950 shadow-sm'
                     : 'text-slate-400 hover:text-white'
                 }`}
               >
-                Por Ambientes
+                Por Ambiente (Principal)
+              </button>
+              <button
+                onClick={() => setViewMode('grupos')}
+                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                  viewMode === 'grupos'
+                    ? 'bg-amber-400 text-slate-950 shadow-sm'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Por Grupo (Secundário)
               </button>
             </div>
           </div>
@@ -890,7 +891,8 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
             </div>
           ) : (
             groupedData.map((group) => {
-              const isExpanded = expandedGroups[group.grupoNome] !== false; // expanded by default
+              // Grupos iniciam recolhidos por padrão na vista secundária
+              const isExpanded = !!expandedGroups[group.grupoNome];
               const groupPercent = rawTotalActive > 0 ? (group.subtotal / rawTotalActive) * 100 : 0;
 
               return (
