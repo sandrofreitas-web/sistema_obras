@@ -1,14 +1,17 @@
 {
   "short_name": "ObraCerta",
   "name": "ObraCerta — Gestor de Materiais & Orçamentos de Obra",
+  "description": "Gestor de Materiais & Orçamentos de Obra com Leitura Inteligente de Etiquetas e Sincronização Offline",
   "icons": [
     {
-      "src": "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f59e0b'><path d='M12 3L2 12h3v8h14v-8h3L12 3zm0 2.84L18.8 11H17v7H7v-7H5.2L12 5.84z'/></svg>",
+      "src": "/icon.svg",
       "type": "image/svg+xml",
-      "sizes": "192x192 512x512"
+      "sizes": "192x192 512x512",
+      "purpose": "any maskable"
     }
   ],
   "start_url": "/",
+  "scope": "/",
   "background_color": "#090d16",
   "theme_color": "#090d16",
   "display": "standalone",

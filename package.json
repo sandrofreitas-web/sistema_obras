@@ -1,0 +1,10 @@
+{
+  "name": "sistema-obras",
+  "version": "1.2.0",
+  "private": true,
+  "description": "Sistema de Gestão de Materiais e Obras ICENV 2026 — PWA Offline-First",
+  "scripts": {
+    "build": "npm --prefix src/frontend run build",
+    "start": "npm --prefix src/frontend run preview"
+  }
+}
