@@ -61,6 +61,23 @@ const getGroupIcon = (classeNome: string) => {
   return <Tag className="w-4 h-4 text-slate-400" />;
 };
 
+// Helpers de formatação no padrão brasileiro (pt-BR)
+// 1. Nos cards de resumo/telemetria: mantém R$ (ex: R$ 1.250,50)
+const formatCurrencyBR = (val: number): string => {
+  return (val || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+};
+
+// 2. Nas listas e tabelas de itens/subtotais: sem R$, com separador de milhar e vírgula decimal (ex: 1.250,50)
+const formatNumberBR = (val: number): string => {
+  return (val || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 export const BudgetScreen: React.FC<BudgetScreenProps> = ({
   project,
   projects,
@@ -649,7 +666,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               1. Insumos Base
             </span>
             <div className="text-base sm:text-lg font-black text-white font-mono tabular-nums">
-              R$ {rawTotalActive.toFixed(2)}
+              {formatCurrencyBR(rawTotalActive)}
             </div>
             <span className="text-[10px] text-slate-500 font-mono block">
               {items.length} itens • {groupedData.length} grupos
@@ -667,7 +684,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               </span>
             </div>
             <div className="text-base sm:text-lg font-black text-amber-300 font-mono tabular-nums">
-              + R$ {contingencyValue.toFixed(2)}
+              + {formatCurrencyBR(contingencyValue)}
             </div>
             <input
               type="range"
@@ -687,7 +704,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               3. Insumos c/ Margem
             </span>
             <div className="text-base sm:text-lg font-black text-emerald-400 font-mono tabular-nums">
-              R$ {materialsWithContingency.toFixed(2)}
+              {formatCurrencyBR(materialsWithContingency)}
             </div>
             <span className="text-[10px] text-slate-500 font-mono block">
               Previsão de materiais
@@ -700,7 +717,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               4. Mão de Obra Wagner
             </span>
             <div className="text-base sm:text-lg font-black text-sky-400 font-mono tabular-nums">
-              R$ {laborBudget.toFixed(2)}
+              {formatCurrencyBR(laborBudget)}
             </div>
             <span className="text-[10px] text-slate-500 font-mono block">
               Contrato empreitada
@@ -713,10 +730,10 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               5. Teto Global
             </span>
             <div className="text-base sm:text-xl font-black text-amber-300 font-mono tabular-nums">
-              R$ {globalProjectBudget.toFixed(2)}
+              {formatCurrencyBR(globalProjectBudget)}
             </div>
             <span className="text-[10px] text-amber-400/70 font-mono block">
-              R$ {costPerM2.toFixed(2)}/m²
+              {formatCurrencyBR(costPerM2)}/m²
             </span>
           </div>
         </div>
@@ -731,7 +748,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               {compradosCount} de {items.length} itens ({percentComprado.toFixed(0)}%)
             </span>
             <span className="text-[11px] font-mono text-slate-400">
-              Comprado: <strong className="text-emerald-400">R$ {totalComprado.toFixed(2)}</strong> • Pendente: <strong className="text-amber-400">R$ {totalPendente.toFixed(2)}</strong>
+              Comprado: <strong className="text-emerald-400">{formatCurrencyBR(totalComprado)}</strong> • Pendente: <strong className="text-amber-400">{formatCurrencyBR(totalPendente)}</strong>
             </span>
           </div>
 
@@ -845,9 +862,8 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
             Exibindo <strong className="text-white">{filteredItems.length}</strong> de{' '}
             <strong className="text-white">{items.length}</strong> itens
             {filteredItems.length > 0 && (
-              <span className="ml-2 text-emerald-400 font-semibold">
-                (Subtotal filtrado: R${' '}
-                {filteredItems.reduce((acc, i) => acc + i.precoTotal, 0).toFixed(2)})
+              <span className="ml-2 text-emerald-400 font-semibold font-mono">
+                (Subtotal filtrado: {formatNumberBR(filteredItems.reduce((acc, i) => acc + i.precoTotal, 0))})
               </span>
             )}
           </div>
@@ -936,8 +952,8 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                     <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
                       <div className="text-right">
                         <span className="text-[11px] text-slate-400 block">Subtotal do Grupo:</span>
-                        <strong className="text-base sm:text-lg font-black text-amber-400">
-                          R$ {group.subtotal.toFixed(2)}
+                        <strong className="text-base sm:text-lg font-black text-amber-400 font-mono tabular-nums">
+                          {formatNumberBR(group.subtotal)}
                         </strong>
                       </div>
 
@@ -971,8 +987,8 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                                 ({cat.itens.length} {cat.itens.length === 1 ? 'item' : 'itens'})
                               </span>
                             </div>
-                            <span className="text-xs font-extrabold text-emerald-400">
-                              R$ {cat.subtotal.toFixed(2)}
+                            <span className="text-xs font-extrabold text-emerald-400 font-mono tabular-nums">
+                              {formatNumberBR(cat.subtotal)}
                             </span>
                           </div>
 
@@ -1070,13 +1086,13 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                                       </td>
 
                                       {/* Unit Price */}
-                                      <td className="py-2 px-3 text-right text-slate-300 whitespace-nowrap font-mono text-[11px]">
-                                        R$ {item.precoUnitario.toFixed(2)}
+                                      <td className="py-2 px-3 text-right text-slate-300 whitespace-nowrap font-mono text-[11px] tabular-nums">
+                                        {formatNumberBR(item.precoUnitario)}
                                       </td>
 
                                       {/* Subtotal */}
-                                      <td className="py-2 px-3 text-right font-black text-white whitespace-nowrap font-mono text-xs">
-                                        R$ {item.precoTotal.toFixed(2)}
+                                      <td className="py-2 px-3 text-right font-black text-white whitespace-nowrap font-mono text-xs tabular-nums">
+                                        {formatNumberBR(item.precoTotal)}
                                       </td>
 
                                       {/* Reference Store / Quotation */}
@@ -1172,8 +1188,8 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                   <div className="flex items-center gap-3">
                     <div className="text-right">
                       <span className="text-[11px] text-slate-400 block sm:inline mr-1">Subtotal:</span>
-                      <strong className="text-sm sm:text-base font-extrabold text-emerald-400">
-                        R$ {roomTotal.toFixed(2)}
+                      <strong className="text-sm sm:text-base font-extrabold text-emerald-400 font-mono tabular-nums">
+                        {formatNumberBR(roomTotal)}
                       </strong>
                     </div>
 
@@ -1275,13 +1291,13 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                                   </td>
 
                                   {/* Preço Unit */}
-                                  <td className="py-2 px-3 text-right text-slate-300 whitespace-nowrap font-mono text-[11px]">
-                                    R$ {item.precoUnitario.toFixed(2)}
+                                  <td className="py-2 px-3 text-right text-slate-300 whitespace-nowrap font-mono text-[11px] tabular-nums">
+                                    {formatNumberBR(item.precoUnitario)}
                                   </td>
 
                                   {/* Subtotal */}
-                                  <td className="py-2 px-3 text-right font-black text-white whitespace-nowrap font-mono text-xs">
-                                    R$ {item.precoTotal.toFixed(2)}
+                                  <td className="py-2 px-3 text-right font-black text-white whitespace-nowrap font-mono text-xs tabular-nums">
+                                    {formatNumberBR(item.precoTotal)}
                                   </td>
 
                                   {/* Ações */}
