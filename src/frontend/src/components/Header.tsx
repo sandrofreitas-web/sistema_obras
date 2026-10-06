@@ -38,6 +38,25 @@ export const Header: React.FC<HeaderProps> = ({
 }) => {
   const pendingOfflineCount = offlineQueue.filter((q) => q.status === 'pendente' || q.status === 'erro').length;
 
+  // Forçar atualização do aplicativo limpando caches do navegador/PWA
+  const handleForceUpdateApp = async () => {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          await reg.unregister();
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao limpar cache:', e);
+    }
+    window.location.reload();
+  };
+
   return (
     <header className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 text-white shadow-md">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
@@ -129,6 +148,16 @@ export const Header: React.FC<HeaderProps> = ({
               <span className="hidden md:inline">{isOnline ? 'Online' : 'Offline'}</span>
             </div>
           )}
+
+          {/* Botão de Atualização do App / Versão (Limpa Cache Instantaneamente) */}
+          <button
+            onClick={handleForceUpdateApp}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 border border-slate-700 text-[11px] font-mono transition-colors active:scale-95"
+            title="Versão v1.2.2 ativa. Clique para forçar atualização e limpar cache do celular"
+          >
+            <RefreshCw className="w-3 h-3 text-amber-400" />
+            <span>v1.2.2</span>
+          </button>
 
           {/* Desktop/Mobile preview simulator toggle (visible on desktop screens) */}
           <button

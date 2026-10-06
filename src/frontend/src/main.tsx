@@ -10,18 +10,37 @@ if ('serviceWorker' in navigator && window.location.protocol.startsWith('http'))
       .register('/sw.js')
       .then((reg) => {
         console.log('PWA ServiceWorker registrado:', reg.scope);
-        // Verifica se há novas atualizações em background
+        // Forçar busca de atualização imediata na rede
         reg.update().catch(() => {});
+
+        // Se já houver um worker esperando, força ele a assumir imediatamente
+        if (reg.waiting) {
+          reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+        }
+
+        reg.addEventListener('updatefound', () => {
+          const newWorker = reg.installing;
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                // Nova versão detectada: assume imediatamente
+                console.log('Nova versão encontrada! Ativando...');
+                newWorker.postMessage({ type: 'SKIP_WAITING' });
+              }
+            });
+          }
+        });
       })
       .catch((err) => console.log('Falha no ServiceWorker:', err));
   });
 
-  // Atualização transparente quando um novo worker assume
+  // Atualização transparente quando um novo worker assume o controle
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (!refreshing) {
       refreshing = true;
-      console.log('Novo ServiceWorker ativado.');
+      console.log('Novo ServiceWorker ativado. Recarregando aplicação...');
+      window.location.reload();
     }
   });
 }

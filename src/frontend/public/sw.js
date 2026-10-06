@@ -1,10 +1,22 @@
-const CACHE_NAME = 'obracerta-v3-offline';
+const CACHE_NAME = 'obracerta-v4-20261006-2';
 const CORE_ASSETS = [
   '/',
   '/index.html',
   '/manifest.json',
   '/icon.svg'
 ];
+
+// Listener para comandos vindos do app (ex: forçar skip waiting ou limpar cache)
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+  if (event.data && event.data.type === 'CLEAR_CACHE') {
+    caches.keys().then((keys) => {
+      return Promise.all(keys.map((k) => caches.delete(k)));
+    });
+  }
+});
 
 // Instalação do Service Worker: pré-carrega os arquivos essenciais da casca da aplicação
 self.addEventListener('install', (event) => {
