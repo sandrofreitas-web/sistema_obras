@@ -1090,14 +1090,14 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                                         <div className="flex items-center justify-center gap-1">
                                           <button
                                             onClick={() => handleOpenEditItem(item)}
-                                            className="p-1 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded transition-colors"
+                                            className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-md transition-all active:scale-95"
                                             title="Alterar este item"
                                           >
                                             <Edit2 className="w-3.5 h-3.5" />
                                           </button>
                                           <button
                                             onClick={() => handleDeleteItem(item.id, item.materialNome)}
-                                            className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors"
+                                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-md transition-all active:scale-95"
                                             title="Excluir este item do orçamento"
                                           >
                                             <Trash2 className="w-3.5 h-3.5" />
@@ -1287,13 +1287,15 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
                                     <div className="flex items-center justify-center gap-1">
                                       <button
                                         onClick={() => handleOpenEditItem(item)}
-                                        className="p-1 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded transition-colors"
+                                        className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-md transition-all active:scale-95"
+                                        title="Alterar este item"
                                       >
                                         <Edit2 className="w-3.5 h-3.5" />
                                       </button>
                                       <button
                                         onClick={() => handleDeleteItem(item.id, item.materialNome)}
-                                        className="p-1 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded transition-colors"
+                                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-md transition-all active:scale-95"
+                                        title="Excluir este item"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
