@@ -42,12 +42,22 @@ O sistema opera com o caso real da **Igreja Cristã Evangélica Nova Vida**, est
 
 ---
 
-## 📱 Acesso Mobile (PWA no Celular)
+## 📱 Acesso Mobile & PWA Offline-First no Celular
 
-O aplicativo pode ser acessado diretamente no smartphone via navegador ou instalado como PWA:
-* **Link Seguro PWA (Cloudflare Tunnel):**  
-  👉 **`https://sensors-catch-corporate-reprints.trycloudflare.com`**
-* **Acesso na Rede Local (Wi-Fi):** `http://<IP-do-computador>:3080`
+O aplicativo é um **PWA (Progressive Web App) Offline-First**, o que significa que **ele funciona 100% no celular mesmo com o computador desligado e sem conexão à internet**:
+
+* **Link Seguro PWA (Cloudflare Tunnel Ativo):**  
+  👉 **`https://ext-fallen-administrative-bent.trycloudflare.com`**
+* **Deploy Cloud na Vercel:**  
+  👉 Conectado automaticamente ao repositório GitHub `sandrofreitas-web/sistema_obras`.
+  *(Configurado com `vercel.json` na raiz e em `src/frontend/` para build Vite com SPA fallback).*
+* **Acesso na Rede Local (Wi-Fi):** `http://192.168.101.16:3080`
+
+### 📲 Como Instalar e Usar 100% Offline no Celular:
+1. Abra o link no navegador do celular (Chrome no Android ou Safari no iOS).
+2. Toque no menu do navegador e selecione **"Adicionar à Tela Inicial"** ou **"Instalar Aplicativo"**.
+3. O ícone oficial do **ObraCerta** será criado na tela inicial do celular.
+4. **Pronto!** O Service Worker salva todo o código, telas e catálogo na memória local. Você pode consultar materiais, editar tabelas de detalhamento da obra, alternar entre os projetos e registrar cotações mesmo em modo avião ou sem sinal!
 
 ---
 
