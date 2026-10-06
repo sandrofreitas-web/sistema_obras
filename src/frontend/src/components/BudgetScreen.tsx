@@ -535,7 +535,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
     <div className="space-y-5 pb-20">
       {/* Sequential Phase Switcher Bar */}
       {projects && projects.length > 1 && onSelectProject && (
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-sm">
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
           <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
             <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5 mr-1 flex-shrink-0">
               <Sparkles className="w-3.5 h-3.5 text-amber-400" />
@@ -757,7 +757,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
       </div>
 
       {/* Detailing Control Bar: Search, Filters & View Toggle */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 space-y-3">
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
           {/* Search Input */}
           <div className="relative flex-1">
@@ -873,7 +873,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
       {viewMode === 'grupos' && (
         <div className="space-y-4">
           {groupedData.length === 0 ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-10 text-center text-slate-400 space-y-3">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-400 space-y-3">
               <Layers className="w-8 h-8 text-slate-600 mx-auto" />
               <p className="text-sm font-semibold">Nenhum item encontrado para os filtros selecionados.</p>
               <button
@@ -896,7 +896,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
               return (
                 <div
                   key={group.grupoNome}
-                  className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm transition-all"
+                  className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm transition-all"
                 >
                   {/* Grupo Header */}
                   <div className="p-3.5 sm:p-4 bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800">
@@ -1132,7 +1132,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
             return (
               <div
                 key={ambiente.id}
-                className="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden shadow-sm"
+                className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm"
               >
                 {/* Room Header row */}
                 <div className="p-3.5 bg-slate-900 flex items-center justify-between border-b border-slate-800">

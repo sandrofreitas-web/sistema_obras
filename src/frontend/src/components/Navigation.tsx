@@ -85,17 +85,17 @@ export const Navigation: React.FC<NavigationProps> = ({
           <div className="py-2">
             <button
               onClick={onOpenCapture}
-              className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-600 hover:to-amber-700 text-slate-950 font-bold text-sm shadow-md shadow-amber-500/20 active:scale-95 transition-all"
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs sm:text-sm shadow-sm active:scale-95 transition-all"
             >
               <Camera className="w-4 h-4 stroke-[2.5]" />
-              <span>Fotografar Etiqueta (OCR)</span>
+              <span>+ Capturar Etiqueta</span>
             </button>
           </div>
         </div>
       </nav>
 
       {/* Mobile Sticky Bottom Navigation Bar */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 text-slate-400 px-2 py-1 shadow-2xl safe-area-bottom">
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 z-40 bg-slate-900/95 backdrop-blur-md border-t border-slate-800 text-slate-400 px-2 py-1 shadow-lg safe-area-bottom">
         <div className="flex items-center justify-around relative">
           {/* Tab: Catálogo */}
           <button
@@ -120,13 +120,13 @@ export const Navigation: React.FC<NavigationProps> = ({
           </button>
 
           {/* Center Elevated Floating Camera Button */}
-          <div className="-mt-6 flex flex-col items-center">
+          <div className="-mt-5 flex flex-col items-center">
             <button
               onClick={onOpenCapture}
-              className="w-14 h-14 rounded-full bg-gradient-to-tr from-amber-500 via-amber-400 to-amber-300 text-slate-950 flex items-center justify-center shadow-lg shadow-amber-500/40 border-4 border-slate-900 active:scale-90 transition-transform"
+              className="w-12 h-12 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 flex items-center justify-center border-2 border-slate-900 shadow-sm active:scale-90 transition-transform"
               aria-label="Fotografar Etiqueta"
             >
-              <Camera className="w-7 h-7 stroke-[2.4]" />
+              <Camera className="w-6 h-6 stroke-[2.4]" />
             </button>
             <span className="text-[10px] font-bold text-amber-400 mt-0.5">Capturar</span>
           </div>

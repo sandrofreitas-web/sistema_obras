@@ -43,8 +43,8 @@ export const Header: React.FC<HeaderProps> = ({
       <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
         {/* Brand / Logo */}
         <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-amber-400 flex items-center justify-center shadow-lg shadow-amber-500/20 text-slate-950 font-black flex-shrink-0">
-            <HardHat className="w-6 h-6 stroke-[2.2]" />
+          <div className="w-9 h-9 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0 shadow-sm">
+            <HardHat className="w-5 h-5 stroke-[2.2]" />
           </div>
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">

@@ -228,7 +228,7 @@ export const ProjectItemModal: React.FC<ProjectItemModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-5">
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl w-full max-w-2xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200 max-h-[92vh]">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-2xl overflow-hidden flex flex-col shadow-xl animate-in fade-in zoom-in-95 duration-200 max-h-[92vh]">
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
           <div className="flex items-center gap-2.5">
@@ -258,7 +258,7 @@ export const ProjectItemModal: React.FC<ProjectItemModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-5">
           {/* Quick Picker from Catalog (Only in Create mode or when searching) */}
           {mode === 'create' && (
-            <div className="bg-slate-950/70 border border-slate-800 rounded-2xl p-4 space-y-3">
+            <div className="bg-slate-950/70 border border-slate-800 rounded-lg p-3.5 space-y-3">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5 uppercase tracking-wider">
                   <Sparkles className="w-3.5 h-3.5" />
@@ -452,7 +452,7 @@ export const ProjectItemModal: React.FC<ProjectItemModalProps> = ({
           </div>
 
           {/* Quantitative & Pricing Block */}
-          <div className="bg-slate-950/60 border border-slate-800 rounded-2xl p-4 space-y-4">
+          <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-3.5 space-y-3.5">
             <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
               <Calculator className="w-3.5 h-3.5 text-amber-400" />
               Quantitativo & Cálculo de Perda Técnica

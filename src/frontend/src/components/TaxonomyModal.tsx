@@ -246,7 +246,7 @@ export const TaxonomyModal: React.FC<TaxonomyModalProps> = ({
   return (
     <div className="max-w-7xl mx-auto space-y-6 pb-20">
       {/* Top Header & Overview */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-5 rounded-2xl shadow-sm">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-slate-900 border border-slate-800 p-4 sm:p-5 rounded-xl shadow-sm">
         <div className="flex items-center gap-3">
           <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 flex items-center justify-center flex-shrink-0">
             <ListTree className="w-6 h-6 stroke-[2.2]" />
@@ -434,7 +434,7 @@ export const TaxonomyModal: React.FC<TaxonomyModalProps> = ({
       </div>
 
       {/* Tabela de Grupos e Categorias */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl shadow-sm overflow-hidden">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs text-slate-300 border-collapse">
             <thead>

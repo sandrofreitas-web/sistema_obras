@@ -139,7 +139,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-xl overflow-hidden flex flex-col shadow-xl animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
           <div className="flex items-center gap-2.5">

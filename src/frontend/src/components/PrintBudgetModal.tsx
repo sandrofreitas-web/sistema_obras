@@ -29,7 +29,7 @@ export const PrintBudgetModal: React.FC<PrintBudgetModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 print:p-0 print:bg-white print:static">
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col shadow-2xl print:border-none print:shadow-none print:max-w-none print:max-h-none print:bg-white print:text-black">
+      <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl max-h-[95vh] overflow-hidden flex flex-col shadow-xl print:border-none print:shadow-none print:max-w-none print:max-h-none print:bg-white print:text-black">
         {/* Modal Controls (Hidden in Print) */}
         <div className="px-5 py-3.5 border-b border-slate-800 flex items-center justify-between bg-slate-900/90 print:hidden">
           <div className="flex items-center gap-2">
