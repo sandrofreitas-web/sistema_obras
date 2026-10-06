@@ -25,32 +25,32 @@ export const Navigation: React.FC<NavigationProps> = ({
   const tabs = [
     {
       id: 'catalogo' as TabType,
-      label: 'Catálogo de Materiais',
-      mobileLabel: 'Catálogo',
+      label: 'Catálogo de Insumos',
+      mobileLabel: 'Insumos',
       icon: Layers,
     },
     {
       id: 'orcamento' as TabType,
-      label: 'Projetos & Simulação',
-      mobileLabel: 'Orçamento',
+      label: 'Detalhamento do Projeto',
+      mobileLabel: 'Projeto',
       icon: Calculator,
     },
     {
       id: 'execucao' as TabType,
-      label: 'Controle de Obra & Custos',
-      mobileLabel: 'Execução',
+      label: 'Controle de Custos & NF',
+      mobileLabel: 'Custos',
       icon: TrendingUp,
     },
     {
       id: 'etapas' as TabType,
-      label: 'Avanço Físico (Módulo 5)',
-      mobileLabel: 'Etapas',
+      label: 'Cronograma Físico',
+      mobileLabel: 'Cronograma',
       icon: Hammer,
     },
     {
       id: 'taxonomia' as TabType,
-      label: 'Taxonomia',
-      mobileLabel: 'Categorias',
+      label: 'Taxonomia de Materiais',
+      mobileLabel: 'Taxonomia',
       icon: ListTree,
     },
   ];

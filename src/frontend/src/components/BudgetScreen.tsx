@@ -573,183 +573,186 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         </div>
       )}
 
-      {/* Top Project Banner */}
-      <div className="bg-slate-900 border border-slate-800 rounded-3xl p-5 sm:p-6 shadow-sm space-y-4">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-          <div>
+      {/* Painel Executivo do Projeto — Estilo Técnico de Engenharia */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm space-y-3.5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+          <div className="space-y-1">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 uppercase tracking-wider">
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 uppercase tracking-wider font-mono">
                 {project.status === 'em_andamento' ? 'Fase 1 — Em Execução' : 'Fase 2 — Sequencial'}
               </span>
-              <span className="text-xs text-slate-400 flex items-center gap-1">
+              <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
                 <Building className="w-3.5 h-3.5 text-slate-400" />
-                Área Total: <strong className="text-white">{project.areaTotalM2} m²</strong>
+                Área: <strong className="text-white">{project.areaTotalM2} m²</strong>
               </span>
               {project.pastaDocumentos && (
-                <span className="text-[11px] text-slate-400 flex items-center gap-1 bg-slate-800/80 px-2 py-0.5 rounded border border-slate-700/60 font-mono">
+                <span className="text-[11px] text-amber-400/90 flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-mono">
                   <FolderOpen className="w-3 h-3 text-amber-400" />
                   {project.pastaDocumentos}
                 </span>
               )}
             </div>
 
-            <h1 className="text-xl sm:text-2xl font-black text-white mt-2">
+            <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
               {project.nome}
             </h1>
-            <p className="text-xs sm:text-sm text-slate-400 max-w-3xl mt-1 leading-relaxed">
+            <p className="text-xs text-slate-400 max-w-3xl leading-relaxed">
               {project.descricao}
             </p>
           </div>
 
-          {/* Action Buttons: Add Item & Export Options */}
+          {/* Botões de Ação Rápidos Compactos */}
           <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
             <button
               onClick={() => handleOpenAddItem()}
-              className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs shadow-lg active:scale-95 transition-all"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow active:scale-95 transition-all"
             >
-              <Plus className="w-4 h-4" />
+              <Plus className="w-4 h-4 stroke-[2.5]" />
               <span>+ Incluir Item</span>
             </button>
 
-            {/* Export Lista de Cotação (CSV) */}
             <button
               onClick={() => handleExportCotacaoCSV(false)}
-              className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/40 text-xs font-bold text-emerald-300 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-xs font-semibold text-emerald-300 transition-colors"
               title="Exportar Lista para Cotação e Compras em Lojas"
             >
-              <ListChecks className="w-4 h-4 text-emerald-400" />
-              <span>Lista de Cotação (CSV)</span>
+              <ListChecks className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Lista de Cotação</span>
             </button>
 
-            {/* Export Orçamento Geral (CSV) */}
             <button
               onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
+              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-xs font-semibold text-slate-200 transition-colors"
               title="Exportar Planilha Completa do Orçamento"
             >
-              <FileSpreadsheet className="w-4 h-4 text-slate-300" />
-              <span>Orçamento (CSV)</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-300" />
+              <span>Orçamento CSV</span>
             </button>
 
             <button
               onClick={onOpenPrintBudget}
-              className="flex items-center gap-1.5 px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700 text-xs font-bold text-slate-200 transition-colors"
+              className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-xs font-semibold text-slate-200 transition-colors"
               title="Visualizar Impressão ou Gerar PDF Executivo"
             >
-              <Printer className="w-4 h-4 text-amber-400" />
-              <span>Imprimir / PDF</span>
+              <Printer className="w-3.5 h-3.5 text-amber-400" />
+              <span>PDF</span>
             </button>
           </div>
         </div>
-      </div>
 
-      {/* Acquisition Progress Bar & Shopping Evolution */}
-      <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400">
-              <ShoppingBag className="w-4 h-4" />
+        {/* Barra de Telemetria Financeira e Aquisições Integrada (Menos cards, mais dados em linha) */}
+        <div className="grid grid-cols-2 md:grid-cols-5 border border-slate-800 rounded-lg overflow-hidden divide-y md:divide-y-0 md:divide-x divide-slate-800/80 bg-slate-950/70 text-xs">
+          {/* 1. Subtotal Insumos */}
+          <div className="p-3 space-y-0.5">
+            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+              1. Insumos Base
+            </span>
+            <div className="text-base sm:text-lg font-black text-white font-mono tabular-nums">
+              R$ {rawTotalActive.toFixed(2)}
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold text-white uppercase tracking-wider">
-                  Evolução das Aquisições (Lista de Compras)
-                </span>
-                <span className="text-[11px] px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 font-extrabold">
-                  {compradosCount} de {items.length} itens comprados ({percentComprado.toFixed(0)}%)
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 mt-0.5">
-                Clique diretamente no status de cada item da tabela para alternar entre Planejado e Comprado.
-              </p>
-            </div>
+            <span className="text-[10px] text-slate-500 font-mono block">
+              {items.length} itens • {groupedData.length} grupos
+            </span>
           </div>
 
-          <div className="flex items-center gap-3 text-xs flex-wrap sm:justify-end">
-            <div className="bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded-xl">
-              <span className="text-slate-400 mr-1.5">Já Comprado:</span>
-              <strong className="text-emerald-400 font-black">R$ {totalComprado.toFixed(2)}</strong>
+          {/* 2. Reserva Técnica */}
+          <div className="p-3 space-y-1">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-mono text-amber-400/90 uppercase tracking-wider">
+                2. Margem Técnica
+              </span>
+              <span className="text-[10px] font-bold text-amber-400 font-mono">
+                {contingencyPercent}%
+              </span>
             </div>
-            <div className="bg-slate-950/70 border border-slate-800 px-3 py-1.5 rounded-xl">
-              <span className="text-slate-400 mr-1.5">A Comprar:</span>
-              <strong className="text-amber-400 font-black">R$ {totalPendente.toFixed(2)}</strong>
+            <div className="text-base sm:text-lg font-black text-amber-300 font-mono tabular-nums">
+              + R$ {contingencyValue.toFixed(2)}
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="25"
+              step="5"
+              value={contingencyPercent}
+              onChange={(e) => handleUpdateContingency(parseInt(e.target.value, 10))}
+              className="w-full accent-amber-400 h-1 cursor-pointer block"
+              title="Ajustar margem técnica"
+            />
+          </div>
+
+          {/* 3. Materiais c/ Margem */}
+          <div className="p-3 space-y-0.5">
+            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+              3. Insumos c/ Margem
+            </span>
+            <div className="text-base sm:text-lg font-black text-emerald-400 font-mono tabular-nums">
+              R$ {materialsWithContingency.toFixed(2)}
+            </div>
+            <span className="text-[10px] text-slate-500 font-mono block">
+              Previsão de materiais
+            </span>
+          </div>
+
+          {/* 4. Mão de Obra Wagner */}
+          <div className="p-3 space-y-0.5">
+            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
+              4. Mão de Obra Wagner
+            </span>
+            <div className="text-base sm:text-lg font-black text-sky-400 font-mono tabular-nums">
+              R$ {laborBudget.toFixed(2)}
+            </div>
+            <span className="text-[10px] text-slate-500 font-mono block">
+              Contrato empreitada
+            </span>
+          </div>
+
+          {/* 5. Custo Global Teto */}
+          <div className="p-3 space-y-0.5 col-span-2 md:col-span-1 bg-amber-500/5">
+            <span className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider block">
+              5. Teto Global
+            </span>
+            <div className="text-base sm:text-xl font-black text-amber-300 font-mono tabular-nums">
+              R$ {globalProjectBudget.toFixed(2)}
+            </div>
+            <span className="text-[10px] text-amber-400/70 font-mono block">
+              R$ {costPerM2.toFixed(2)}/m²
+            </span>
+          </div>
+        </div>
+
+        {/* Faixa Técnica de Status das Aquisições */}
+        <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-[11px] font-mono font-semibold text-slate-300">
+              Evolução das Compras:
+            </span>
+            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
+              {compradosCount} de {items.length} itens ({percentComprado.toFixed(0)}%)
+            </span>
+            <span className="text-[11px] font-mono text-slate-400">
+              Comprado: <strong className="text-emerald-400">R$ {totalComprado.toFixed(2)}</strong> • Pendente: <strong className="text-amber-400">R$ {totalPendente.toFixed(2)}</strong>
+            </span>
+          </div>
+
+          {/* Mini Barra de Progresso e Ação */}
+          <div className="flex items-center gap-3">
+            <div className="w-24 sm:w-32 bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
+              <div
+                className="bg-emerald-400 h-full rounded-full transition-all"
+                style={{ width: `${Math.min(percentComprado, 100)}%` }}
+              />
             </div>
             {totalPendente > 0 && (
               <button
                 onClick={() => handleExportCotacaoCSV(true)}
-                className="text-[11px] font-bold text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-1"
-                title="Exportar apenas itens pendentes para cotação"
+                className="text-[11px] font-mono font-bold text-amber-400 hover:underline flex items-center gap-1"
+                title="Exportar apenas itens pendentes"
               >
-                <Download className="w-3.5 h-3.5" />
+                <Download className="w-3 h-3" />
                 Baixar Pendentes
               </button>
             )}
           </div>
-        </div>
-
-        {/* Progress Bar */}
-        <div className="w-full bg-slate-950 rounded-full h-2.5 overflow-hidden border border-slate-800">
-          <div
-            className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-500"
-            style={{ width: `${Math.min(percentComprado, 100)}%` }}
-          />
-        </div>
-      </div>
-
-      {/* KPI Cards: Executive Financial Overview */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Subtotal Materiais */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-          <span className="text-xs text-slate-400 font-medium">Subtotal Materiais</span>
-          <div className="text-lg sm:text-2xl font-black text-white mt-1">
-            R$ {rawTotalActive.toFixed(2)}
-          </div>
-          <span className="text-[11px] text-slate-500 mt-1 block">
-            {items.length} itens em {groupedData.length} grupos
-          </span>
-        </div>
-
-        {/* Contingência / Reserva Slider */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 flex flex-col justify-between">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-amber-400 font-medium">Contingência / Reserva</span>
-            <span className="text-xs font-bold text-amber-400">{contingencyPercent}%</span>
-          </div>
-          <div className="text-lg sm:text-2xl font-black text-amber-300 mt-1">
-            + R$ {contingencyValue.toFixed(2)}
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="25"
-            step="5"
-            value={contingencyPercent}
-            onChange={(e) => handleUpdateContingency(parseInt(e.target.value, 10))}
-            className="w-full accent-amber-400 mt-2 cursor-pointer"
-            title="Ajustar margem de contingência"
-          />
-        </div>
-
-        {/* Total Materiais com Margem */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4">
-          <span className="text-xs text-slate-400 font-medium">Materiais com Margem</span>
-          <div className="text-lg sm:text-2xl font-black text-emerald-400 mt-1">
-            R$ {materialsWithContingency.toFixed(2)}
-          </div>
-          <span className="text-[11px] text-slate-400 mt-1 block">
-            + Mão de Obra: R$ {laborBudget.toFixed(2)}
-          </span>
-        </div>
-
-        {/* Custo Global da Frente */}
-        <div className="bg-slate-900 border border-amber-500/30 rounded-2xl p-4 bg-gradient-to-br from-slate-900 to-amber-950/20">
-          <span className="text-xs text-amber-400 font-bold uppercase tracking-wider">Custo Global da Frente</span>
-          <div className="text-xl sm:text-3xl font-black text-white mt-1">
-            R$ {globalProjectBudget.toFixed(2)}
-          </div>
-          <span className="text-[11px] text-amber-300/80 mt-1 block">
-            Média: R$ {costPerM2.toFixed(2)} / m² ({project.areaTotalM2} m²)
-          </span>
         </div>
       </div>
 
