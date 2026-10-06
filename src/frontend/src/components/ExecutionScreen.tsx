@@ -20,6 +20,23 @@ interface ExecutionScreenProps {
   onProjectUpdated: (project: Projeto) => void;
 }
 
+// Helpers de formatação no padrão brasileiro (pt-BR)
+// 1. Nos cards de resumo/telemetria: mantém R$ (ex: R$ 1.250,50)
+const formatCurrencyBR = (val: number): string => {
+  return (val || 0).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
+};
+
+// 2. Nas listas e tabelas de desvios e compras: sem R$, com separador de milhar e vírgula decimal (ex: 1.250,50)
+const formatNumberBR = (val: number): string => {
+  return (val || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
   project,
   onOpenRegisterPurchase,
@@ -129,7 +146,7 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
               >
                 <span>{o.categoria}:</span>
                 <strong className="text-rose-100">
-                  +R$ {o.deviance.toFixed(2)} (+{o.deviancePercent.toFixed(1)}%)
+                  +{formatCurrencyBR(o.deviance)} (+{o.deviancePercent.toFixed(1)}%)
                 </strong>
               </span>
             ))}
@@ -145,10 +162,10 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
             1. Orçado Total (Ativo)
           </span>
           <div className="text-base sm:text-lg font-black text-white font-mono tabular-nums">
-            R$ {totalPlannedWithMargin.toFixed(2)}
+            {formatCurrencyBR(totalPlannedWithMargin)}
           </div>
           <span className="text-[10px] text-slate-500 font-mono block">
-            Meta: R$ {plannedCostPerM2.toFixed(2)}/m²
+            Meta: {formatCurrencyBR(plannedCostPerM2)}/m²
           </span>
         </div>
 
@@ -158,10 +175,10 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
             2. Realizado da Obra
           </span>
           <div className="text-base sm:text-lg font-black text-emerald-400 font-mono tabular-nums">
-            R$ {realTotalSpent.toFixed(2)}
+            {formatCurrencyBR(realTotalSpent)}
           </div>
           <span className="text-[10px] text-slate-500 font-mono block">
-            Atual: R$ {realCostPerM2.toFixed(2)}/m²
+            Atual: {formatCurrencyBR(realCostPerM2)}/m²
           </span>
         </div>
 
@@ -198,7 +215,7 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
               balanceRemaining >= 0 ? 'text-sky-400' : 'text-rose-400'
             }`}
           >
-            R$ {Math.abs(balanceRemaining).toFixed(2)}
+            {formatCurrencyBR(Math.abs(balanceRemaining))}
           </div>
           <span className="text-[10px] text-slate-500 font-mono block">
             {balanceRemaining >= 0 ? 'Dentro do teto previsto' : 'Estouro acumulado'}
@@ -222,9 +239,9 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
             <thead>
               <tr className="bg-slate-950/40 text-slate-400 font-mono text-[11px] border-b border-slate-800 tracking-wider uppercase">
                 <th className="py-2.5 px-3">Grupo / Categoria</th>
-                <th className="py-2.5 px-3 text-right">Planejado (R$)</th>
-                <th className="py-2.5 px-3 text-right">Realizado (R$)</th>
-                <th className="py-2.5 px-3 text-right">Desvio (R$)</th>
+                <th className="py-2.5 px-3 text-right">Planejado</th>
+                <th className="py-2.5 px-3 text-right">Realizado</th>
+                <th className="py-2.5 px-3 text-right">Desvio</th>
                 <th className="py-2.5 px-3 text-right">Desvio (%)</th>
                 <th className="py-2.5 px-3 text-center">Status</th>
               </tr>
@@ -236,10 +253,10 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
                   <tr key={cat.categoria} className="hover:bg-slate-800/40 transition-colors">
                     <td className="py-2 px-3 font-semibold text-slate-200">{cat.categoria}</td>
                     <td className="py-2 px-3 text-right font-mono text-slate-300 tabular-nums">
-                      R$ {cat.planned.toFixed(2)}
+                      {formatNumberBR(cat.planned)}
                     </td>
                     <td className="py-2 px-3 text-right font-mono font-bold text-slate-100 tabular-nums">
-                      R$ {cat.actual.toFixed(2)}
+                      {formatNumberBR(cat.actual)}
                     </td>
                     <td
                       className={`py-2 px-3 text-right font-mono font-bold tabular-nums ${
@@ -247,7 +264,7 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
                       }`}
                     >
                       {cat.deviance > 0 ? '+' : ''}
-                      R$ {cat.deviance.toFixed(2)}
+                      {formatNumberBR(cat.deviance)}
                     </td>
                     <td
                       className={`py-2 px-3 text-right font-mono font-bold tabular-nums ${
@@ -362,12 +379,12 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
 
                     {/* Unitário */}
                     <td className="py-2 px-3 text-right font-mono text-slate-300 tabular-nums text-[11px]">
-                      R$ {compra.valorUnitario.toFixed(2)}
+                      {formatNumberBR(compra.valorUnitario)}
                     </td>
 
                     {/* Total */}
                     <td className="py-2 px-3 text-right font-mono font-bold text-emerald-400 tabular-nums text-xs">
-                      R$ {compra.valorTotal.toFixed(2)}
+                      {formatNumberBR(compra.valorTotal)}
                     </td>
 
                     {/* Forma de Pagamento */}

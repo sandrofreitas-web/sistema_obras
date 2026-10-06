@@ -26,6 +26,14 @@ interface CatalogScreenProps {
   onOpenAddToProject: (material: Material) => void;
 }
 
+// Formatação numérica brasileira (ex: 1.250,50) sem o símbolo 'R$' para tabelas e listas
+const formatNumberBR = (val: number): string => {
+  return (val || 0).toLocaleString('pt-BR', {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   materials,
   taxonomia,
@@ -336,7 +344,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                       {/* Preço Unitário */}
                       <td className="py-2 px-3 text-right align-middle">
                         <span className="font-mono font-bold text-emerald-400 text-xs tabular-nums">
-                          R$ {mat.precoAtual.toFixed(2)}
+                          {formatNumberBR(mat.precoAtual)}
                         </span>
                         <span className="text-[10px] text-slate-400 ml-1 font-mono">
                           /{mat.unidade}
@@ -347,7 +355,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                       <td className="py-2 px-3 align-middle text-[11px] font-mono text-slate-300">
                         {mat.precoPorEmbalagem ? (
                           <div>
-                            <span className="text-slate-200">R$ {mat.precoPorEmbalagem.toFixed(2)}</span>
+                            <span className="text-slate-200">{formatNumberBR(mat.precoPorEmbalagem)}</span>
                             {mat.coberturaPorEmbalagem && (
                               <span className="text-slate-500 text-[10px] block">
                                 {mat.coberturaPorEmbalagem} {mat.unidade}/cx
@@ -452,13 +460,13 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
                   <div>
                     <div className="flex items-baseline gap-1">
                       <span className="text-base font-extrabold text-emerald-400 font-mono tabular-nums">
-                        R$ {mat.precoAtual.toFixed(2)}
+                        {formatNumberBR(mat.precoAtual)}
                       </span>
                       <span className="text-[11px] text-slate-400 font-mono">/{mat.unidade}</span>
                     </div>
                     {mat.precoPorEmbalagem && (
                       <p className="text-[10px] text-slate-500 font-mono">
-                        R$ {mat.precoPorEmbalagem.toFixed(2)} cx
+                        {formatNumberBR(mat.precoPorEmbalagem)} cx
                       </p>
                     )}
                   </div>
