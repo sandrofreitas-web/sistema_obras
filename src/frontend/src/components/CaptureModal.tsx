@@ -17,6 +17,11 @@ import {
   ArrowRight,
   TrendingDown,
   History,
+  CloudUpload,
+  Images,
+  Trash2,
+  Zap,
+  Check
 } from 'lucide-react';
 import { Material, Loja, TaxonomiaClasse, OCRResult, UnidadeMedida } from '../types';
 import { ocrService } from '../services/ocrService';
@@ -30,7 +35,44 @@ interface CaptureModalProps {
   lojas: Loja[];
   onSaveMaterial: (material: Material) => void;
   onPriceUpdated?: (material: Material) => void;
+  onOfflineQueueUpdated?: () => void;
 }
+
+// Compressor de alta performance em Canvas para evitar estouro de LocalStorage no celular
+const compressImageFile = (file: File, maxWidth = 1200, quality = 0.8): Promise<string> => {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        if (width > maxWidth) {
+          height = Math.round((height * maxWidth) / width);
+          width = maxWidth;
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          resolve(e.target?.result as string);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => {
+        resolve(e.target?.result as string);
+      };
+      img.src = e.target?.result as string;
+    };
+    reader.onerror = () => {
+      resolve('');
+    };
+    reader.readAsDataURL(file);
+  });
+};
 
 export const CaptureModal: React.FC<CaptureModalProps> = ({
   isOpen,
@@ -39,18 +81,32 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   lojas,
   onSaveMaterial,
   onPriceUpdated,
+  onOfflineQueueUpdated,
 }) => {
-  // Steps: 'capture' (photo input) -> 'processing' (OCR loading) -> 'confirm' (human validation)
-  const [step, setStep] = useState<'capture' | 'processing' | 'confirm'>('capture');
-  const [capturedImage, setCapturedImage] = useState<string | null>(null);
+  // Steps:
+  // 'capture': Escolha entre câmera e galeria
+  // 'batch_preview': Pré-visualização de fotos da galeria / câmera para decidir se analisa agora ou guarda offline
+  // 'processing': Execução do OCR com IA
+  // 'confirm': Validação e cadastro final do item
+  const [step, setStep] = useState<'capture' | 'batch_preview' | 'processing' | 'confirm'>('capture');
+
   const [selectedStoreHint, setSelectedStoreHint] = useState<string>('');
   const [ocrError, setOcrError] = useState<string | null>(null);
+
+  // Armazenamento em lote de fotos selecionadas
+  const [selectedPhotos, setSelectedPhotos] = useState<string[]>([]);
+  const [activePhotoIndex, setActivePhotoIndex] = useState<number>(0);
+  const [isCompressing, setIsCompressing] = useState<boolean>(false);
+  const [batchSavedSuccess, setBatchSavedSuccess] = useState<number | null>(null);
 
   // Live camera states
   const [isCameraActive, setIsCameraActive] = useState<boolean>(false);
   const [cameraFacing, setCameraFacing] = useState<'environment' | 'user'>('environment');
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Refs de inputs separados para Câmera e Galeria
+  const cameraInputRef = useRef<HTMLInputElement | null>(null);
+  const galleryInputRef = useRef<HTMLInputElement | null>(null);
 
   // Extracted and editable fields for Step 3
   const [fabricante, setFabricante] = useState('');
@@ -81,15 +137,17 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setStep('capture');
-      setCapturedImage(null);
+      setSelectedPhotos([]);
+      setActivePhotoIndex(0);
       setOcrError(null);
       setDuplicateMaterial(null);
+      setBatchSavedSuccess(null);
       setSelectedStoreHint(lojas[0]?.nome || '');
       stopCamera();
     } else {
       stopCamera();
     }
-  }, [isOpen]);
+  }, [isOpen, lojas]);
 
   // Start live webcam / mobile camera
   const startCamera = async () => {
@@ -103,9 +161,10 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
         videoRef.current.play();
       }
     } catch (err: any) {
-      console.warn('Camera access denied or unavailable:', err);
+      console.warn('Camera access stream fallback:', err);
       setIsCameraActive(false);
-      alert('Não foi possível acessar a câmera do dispositivo. Por favor, selecione uma foto da galeria.');
+      // Fallback para input nativo com capture="environment"
+      cameraInputRef.current?.click();
     }
   };
 
@@ -128,25 +187,86 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
       ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
       stopCamera();
-      processImage(dataUrl);
+      setSelectedPhotos([dataUrl]);
+      setActivePhotoIndex(0);
+      setStep('batch_preview');
     }
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // 1. Upload Direto pela Câmera Nativa (Fallback)
+  const handleCameraNativeCapture = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        processImage(reader.result);
+    setIsCompressing(true);
+    const compressed = await compressImageFile(file, 1200, 0.82);
+    setIsCompressing(false);
+    if (compressed) {
+      setSelectedPhotos([compressed]);
+      setActivePhotoIndex(0);
+      setStep('batch_preview');
+    }
+    e.target.value = '';
+  };
+
+  // 2. Upload da GALERIA (Múltiplas Fotos, SEM capture)
+  const handleGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsCompressing(true);
+    const compressedList: string[] = [];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const compressed = await compressImageFile(file, 1200, 0.8);
+      if (compressed) {
+        compressedList.push(compressed);
       }
-    };
-    reader.readAsDataURL(file);
+    }
+
+    setIsCompressing(false);
+
+    if (compressedList.length > 0) {
+      setSelectedPhotos(compressedList);
+      setActivePhotoIndex(0);
+      setStep('batch_preview');
+    }
+    e.target.value = '';
+  };
+
+  // Ação Rápida de Loja: Salvar todas as fotos na Fila Offline sem esperar OCR
+  const handleSaveAllToOfflineQueue = () => {
+    if (selectedPhotos.length === 0) return;
+
+    selectedPhotos.forEach((imgBase64) => {
+      storageService.addToOfflineQueue({
+        imagemBase64: imgBase64,
+        lojaSugerida: selectedStoreHint || 'Loja Física',
+      });
+    });
+
+    const count = selectedPhotos.length;
+    setBatchSavedSuccess(count);
+
+    if (onOfflineQueueUpdated) {
+      onOfflineQueueUpdated();
+    }
+
+    // Fecha após breve feedback
+    setTimeout(() => {
+      onClose();
+    }, 1400);
+  };
+
+  // Iniciar Análise com IA da foto ativa
+  const handleStartAnalysisForPhoto = (index = 0) => {
+    const targetImg = selectedPhotos[index];
+    if (!targetImg) return;
+    processImage(targetImg);
   };
 
   // Main processing action: Call OCR Service
   const processImage = async (base64Img: string) => {
-    setCapturedImage(base64Img);
     setStep('processing');
     setOcrError(null);
 
@@ -185,7 +305,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
       ) || matchedCat?.tipos[0];
       setTipo(matchedTipo?.nome || result.tipoSugerido || '');
 
-      // Check deduplication (Seção 3.3)
+      // Check deduplication
       const existing = storageService.checkDuplicateMaterial({
         codigoBarras: result.codigoBarras,
         fabricante: result.fabricante || '',
@@ -197,7 +317,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
     } catch (err: any) {
       console.error('Error during OCR processing:', err);
       setOcrError(err.message || 'Falha ao ler etiqueta. Tente novamente ou insira os dados manualmente.');
-      // Still allow manual editing even if OCR failed
+      // Preenchimento manual de fallback
       setFabricante('');
       setModelo('Material capturado');
       setPreco('');
@@ -220,6 +340,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
     const priceNum = Number(preco);
     const newMaterialId = `mat-${Date.now()}`;
     const nowIso = new Date().toISOString();
+    const currentImg = selectedPhotos[activePhotoIndex] || undefined;
 
     const newMaterial: Material = {
       id: newMaterialId,
@@ -235,8 +356,8 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
       precoPorEmbalagem: precoPorEmbalagem !== '' ? Number(precoPorEmbalagem) : undefined,
       coberturaPorEmbalagem: coberturaPorEmbalagem !== '' ? Number(coberturaPorEmbalagem) : undefined,
       lojaAtual: loja || 'Loja Física',
-      fotoPrincipal: capturedImage || undefined,
-      fotos: capturedImage ? [capturedImage] : [],
+      fotoPrincipal: currentImg,
+      fotos: currentImg ? [currentImg] : [],
       observacoes,
       status,
       historicoPrecos: [
@@ -249,7 +370,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
           coberturaPorEmbalagem: coberturaPorEmbalagem !== '' ? Number(coberturaPorEmbalagem) : undefined,
           loja: loja || 'Loja Física',
           data: nowIso,
-          fotoEtiqueta: capturedImage || undefined,
+          fotoEtiqueta: currentImg,
           confiancaOCR: ocrConfidence,
           observacoes: observacoes || 'Captura de etiqueta via OCR',
         },
@@ -260,14 +381,23 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
 
     storageService.saveMaterial(newMaterial);
     onSaveMaterial(newMaterial);
-    onClose();
+
+    // Se houver mais fotos no lote, avança para a próxima
+    if (selectedPhotos.length > 1 && activePhotoIndex < selectedPhotos.length - 1) {
+      const nextIdx = activePhotoIndex + 1;
+      setActivePhotoIndex(nextIdx);
+      setStep('batch_preview');
+    } else {
+      onClose();
+    }
   };
 
-  // Action: When duplicate detected, update price history of existing material
+  // Action: Duplicate detected, update existing price
   const handleUpdateExistingPrice = () => {
     if (!duplicateMaterial || preco === '') return;
 
     const priceNum = Number(preco);
+    const currentImg = selectedPhotos[activePhotoIndex] || undefined;
     const updated = storageService.addPricePoint(duplicateMaterial.id, {
       preco: priceNum,
       unidade,
@@ -275,38 +405,46 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
       coberturaPorEmbalagem: coberturaPorEmbalagem !== '' ? Number(coberturaPorEmbalagem) : undefined,
       loja: loja || duplicateMaterial.lojaAtual,
       data: new Date().toISOString(),
-      fotoEtiqueta: capturedImage || undefined,
+      fotoEtiqueta: currentImg,
       confiancaOCR: ocrConfidence,
       observacoes: `Novo preço registrado em ${loja || 'loja física'}.`,
     });
 
     if (updated) {
       if (onPriceUpdated) onPriceUpdated(updated);
-      onClose();
+      if (selectedPhotos.length > 1 && activePhotoIndex < selectedPhotos.length - 1) {
+        const nextIdx = activePhotoIndex + 1;
+        setActivePhotoIndex(nextIdx);
+        setStep('batch_preview');
+      } else {
+        onClose();
+      }
     }
   };
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4">
-      <div className="bg-slate-900 border border-slate-800 rounded-xl w-full max-w-4xl max-h-[92vh] overflow-hidden flex flex-col shadow-xl animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-3 sm:p-4 select-none">
+      <div className="bg-[#0c101c] border border-slate-800 rounded-2xl w-full max-w-4xl max-h-[94vh] overflow-hidden flex flex-col shadow-2xl animate-fade-in text-slate-100">
         {/* Header */}
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/90">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400">
-              <Camera className="w-4 h-4" />
+        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between bg-[#0e1424]">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black shadow-md shadow-amber-400/20">
+              <Camera className="w-5 h-5 stroke-[2.5]" />
             </div>
             <div>
-              <h2 className="font-bold text-white text-base sm:text-lg">
-                {step === 'capture' && 'Capturar Etiqueta de Material'}
-                {step === 'processing' && 'Processando Imagem com IA...'}
-                {step === 'confirm' && 'Confirmação e Validação dos Dados'}
+              <h2 className="font-extrabold text-white text-base sm:text-lg tracking-tight">
+                {step === 'capture' && 'Capturar / Enviar Etiquetas'}
+                {step === 'batch_preview' && `Lote de Fotos da Loja (${selectedPhotos.length} fotos)`}
+                {step === 'processing' && 'Analisando Etiqueta com IA...'}
+                {step === 'confirm' && 'Conferência e Cadastro Técnico'}
               </h2>
               <p className="text-xs text-slate-400">
-                {step === 'capture' && 'Tire uma foto da etiqueta ou escolha uma amostra de loja'}
-                {step === 'processing' && 'Visão computacional extraindo fabricante, preço e modelo'}
-                {step === 'confirm' && 'O OCR nunca grava sem a sua confirmação — revise os campos'}
+                {step === 'capture' && 'Selecione fotos da galeria ou abra a câmera'}
+                {step === 'batch_preview' && 'Guarde na fila offline sem esperar na loja ou analise com IA'}
+                {step === 'processing' && 'Extraindo fabricante, preços, modelo e código de barras'}
+                {step === 'confirm' && 'Valide os campos antes de registrar no catálogo'}
               </p>
             </div>
           </div>
@@ -322,38 +460,45 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
         </div>
 
         {/* Body content based on step */}
-        <div className="p-4 sm:p-6 overflow-y-auto flex-1">
+        <div className="p-4 sm:p-6 overflow-y-auto flex-1 text-xs">
           {/* STEP 1: CAPTURE */}
           {step === 'capture' && (
             <div className="space-y-6">
-              {/* Camera Preview or Selection Card */}
+              {/* Indicador de Compressão */}
+              {isCompressing && (
+                <div className="p-3 bg-sky-950/40 border border-sky-800/60 rounded-xl flex items-center justify-center gap-2 text-sky-300 font-mono text-xs animate-pulse">
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  <span>Otimizando fotos no celular para economia de dados...</span>
+                </div>
+              )}
+
+              {/* Visor ao Vivo da Câmera (se ativado) */}
               {isCameraActive ? (
-                <div className="relative rounded-2xl overflow-hidden bg-black aspect-video max-h-80 mx-auto flex items-center justify-center border-2 border-amber-500/40 shadow-inner">
+                <div className="relative rounded-2xl overflow-hidden bg-black aspect-video max-h-80 mx-auto flex items-center justify-center border-2 border-amber-400/60 shadow-2xl">
                   <video
                     ref={videoRef}
                     autoPlay
                     playsInline
                     className="w-full h-full object-cover"
                   />
-                  {/* Camera overlay guide */}
-                  <div className="absolute inset-8 border-2 border-dashed border-amber-400/70 rounded-xl pointer-events-none flex items-center justify-center">
-                    <span className="bg-slate-950/70 text-amber-300 text-xs px-2.5 py-1 rounded-full font-medium">
+                  <div className="absolute inset-8 border-2 border-dashed border-amber-400/80 rounded-xl pointer-events-none flex items-center justify-center">
+                    <span className="bg-slate-950/80 text-amber-300 text-xs px-3 py-1 rounded-full font-bold">
                       Enquadre a etiqueta de preço aqui
                     </span>
                   </div>
 
-                  <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-4 px-4">
+                  <div className="absolute bottom-4 left-0 right-0 flex items-center justify-center gap-3 px-4">
                     <button
                       onClick={stopCamera}
-                      className="px-3 py-1.5 rounded-xl bg-slate-800/90 text-white text-xs font-semibold hover:bg-slate-700"
+                      className="px-3.5 py-2 rounded-xl bg-slate-900/90 text-white text-xs font-semibold hover:bg-slate-800"
                     >
                       Cancelar
                     </button>
                     <button
                       onClick={takePhotoFromCamera}
-                      className="px-6 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-sm shadow-xl active:scale-95 transition-transform flex items-center gap-2"
+                      className="px-6 py-2.5 rounded-full bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-sm shadow-xl active:scale-95 transition-transform flex items-center gap-2"
                     >
-                      <Camera className="w-4 h-4" />
+                      <Camera className="w-4 h-4 stroke-[2.5]" />
                       Capturar Foto
                     </button>
                     <button
@@ -362,7 +507,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                         stopCamera();
                         setTimeout(startCamera, 150);
                       }}
-                      className="p-2 rounded-xl bg-slate-800/90 text-white hover:bg-slate-700"
+                      className="p-2.5 rounded-xl bg-slate-900/90 text-white hover:bg-slate-800"
                       title="Girar câmera"
                     >
                       <RefreshCw className="w-4 h-4" />
@@ -371,63 +516,79 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {/* Action 1: Live camera */}
-                  <button
-                    onClick={startCamera}
-                    className="group border-2 border-dashed border-slate-700 hover:border-amber-400 bg-slate-800/40 hover:bg-amber-500/5 rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer"
-                  >
-                    <div className="w-14 h-14 rounded-2xl bg-amber-500/10 group-hover:bg-amber-500/20 text-amber-400 flex items-center justify-center mb-3 transition-colors">
-                      <Camera className="w-7 h-7" />
-                    </div>
-                    <h3 className="font-bold text-white text-sm mb-1">
-                      Abrir Câmera do Celular
-                    </h3>
-                    <p className="text-xs text-slate-400 max-w-xs">
-                      Aponte diretamente para a etiqueta na prateleira da loja para captura rápida.
-                    </p>
-                  </button>
-
-                  {/* Action 2: Gallery upload */}
+                  {/* OPÇÃO 1: FOTOS DA GALERIA (CORREÇÃO DO BUG: SEM CAPTURE, COM MULTIPLE) */}
                   <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="group border-2 border-dashed border-slate-700 hover:border-amber-400 bg-slate-800/40 hover:bg-amber-500/5 rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer"
+                    onClick={() => galleryInputRef.current?.click()}
+                    className="group border-2 border-dashed border-amber-400/40 hover:border-amber-400 bg-amber-500/5 hover:bg-amber-500/10 rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer shadow-lg"
                   >
                     <input
-                      ref={fileInputRef}
+                      ref={galleryInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleGalleryUpload}
+                      className="hidden"
+                    />
+                    <div className="w-16 h-16 rounded-2xl bg-amber-400 text-slate-950 flex items-center justify-center mb-3 shadow-md shadow-amber-400/20 group-hover:scale-105 transition-transform">
+                      <Images className="w-8 h-8 stroke-[2.2]" />
+                    </div>
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 mb-1">
+                      Recomendado no Celular
+                    </span>
+                    <h3 className="font-extrabold text-white text-base mb-1">
+                      Selecionar Fotos da Galeria
+                    </h3>
+                    <p className="text-xs text-slate-300 max-w-xs leading-relaxed">
+                      Escolha 1 ou <strong>várias fotos</strong> tiradas fora do app no rolo de fotos do celular.
+                    </p>
+                  </div>
+
+                  {/* OPÇÃO 2: CÂMERA DO CELULAR */}
+                  <div
+                    onClick={startCamera}
+                    className="group border-2 border-dashed border-slate-700 hover:border-slate-500 bg-slate-800/30 hover:bg-slate-800/50 rounded-2xl p-6 flex flex-col items-center justify-center text-center transition-all cursor-pointer"
+                  >
+                    <input
+                      ref={cameraInputRef}
                       type="file"
                       accept="image/*"
                       capture="environment"
-                      onChange={handleFileUpload}
+                      onChange={handleCameraNativeCapture}
                       className="hidden"
                     />
-                    <div className="w-14 h-14 rounded-2xl bg-slate-700/50 group-hover:bg-amber-500/20 text-slate-300 group-hover:text-amber-400 flex items-center justify-center mb-3 transition-colors">
-                      <Upload className="w-7 h-7" />
+                    <div className="w-16 h-16 rounded-2xl bg-slate-800 text-slate-300 group-hover:text-amber-400 flex items-center justify-center mb-3 transition-colors">
+                      <Camera className="w-8 h-8" />
                     </div>
-                    <h3 className="font-bold text-white text-sm mb-1">
-                      Enviar Foto da Galeria
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded bg-slate-800 text-slate-400 mb-1">
+                      Ao Vivo
+                    </span>
+                    <h3 className="font-bold text-white text-base mb-1">
+                      Abrir Câmera Agora
                     </h3>
-                    <p className="text-xs text-slate-400 max-w-xs">
-                      Selecione uma imagem já salva no rolo de fotos do seu dispositivo.
+                    <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                      Aponte a câmera diretamente para uma etiqueta de preço na gôndola da loja.
                     </p>
                   </div>
                 </div>
               )}
 
-              {/* Loja identificada / sugestão */}
-              <div className="bg-slate-800/60 border border-slate-700/60 rounded-xl p-3.5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Building2 className="w-4 h-4 text-amber-400 flex-shrink-0" />
+              {/* Loja de Referência para as Fotos */}
+              <div className="bg-[#0f172a] border border-slate-800 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5">
+                  <Building2 className="w-5 h-5 text-amber-400 flex-shrink-0" />
                   <div>
-                    <span className="text-xs font-semibold text-slate-300">Loja Atual (Opcional):</span>
-                    <p className="text-[11px] text-slate-400">Ajuda a IA a calibrar a leitura da etiqueta</p>
+                    <span className="text-xs font-bold text-white block">Loja Onde Você Está (Opcional):</span>
+                    <p className="text-[11px] text-slate-400">
+                      Vinculará automaticamente todas as fotos a este fornecedor
+                    </p>
                   </div>
                 </div>
                 <select
                   value={selectedStoreHint}
                   onChange={(e) => setSelectedStoreHint(e.target.value)}
-                  className="bg-slate-900 border border-slate-700 rounded-lg px-3 py-1.5 text-xs text-slate-200 outline-none focus:border-amber-400"
+                  className="bg-slate-950 border border-slate-700 rounded-lg px-3 py-2 text-xs font-semibold text-amber-400 outline-none focus:border-amber-400"
                 >
-                  <option value="">Detectar automaticamente da etiqueta</option>
+                  <option value="">Detectar automaticamente</option>
                   {lojas.map((l) => (
                     <option key={l.id} value={l.nome}>
                       {l.nome} ({l.cidade || 'SP'})
@@ -436,35 +597,36 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                 </select>
               </div>
 
-              {/* Quick sample tags for testing without a camera */}
-              <div className="border-t border-slate-800 pt-5">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-xs font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                    Ou teste agora com etiquetas de exemplo:
-                  </span>
-                  <span className="text-[11px] text-slate-400">Clique para testar o OCR</span>
-                </div>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Amostras para Teste no Desktop */}
+              <div className="border-t border-slate-800/80 pt-4">
+                <span className="text-[11px] font-mono uppercase tracking-wider text-slate-400 flex items-center gap-1.5 mb-2.5">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                  Ou teste com etiquetas de exemplo:
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                   {SAMPLE_TAGS.map((sample) => (
                     <button
                       key={sample.id}
-                      onClick={() => processImage(sample.imagemUrl)}
-                      className="group bg-slate-800/80 hover:bg-slate-800 border border-slate-700/80 hover:border-amber-400/80 rounded-xl p-3 text-left transition-all flex items-start gap-3"
+                      onClick={() => {
+                        setSelectedPhotos([sample.imagemUrl]);
+                        setActivePhotoIndex(0);
+                        processImage(sample.imagemUrl);
+                      }}
+                      className="bg-[#0e1424] hover:bg-[#141d34] border border-slate-800 hover:border-amber-400/80 rounded-xl p-2.5 text-left transition-all flex items-start gap-2.5"
                     >
                       <img
                         src={sample.imagemUrl}
                         alt={sample.nome}
-                        className="w-14 h-14 rounded-lg object-contain bg-white p-1 flex-shrink-0 border border-slate-700"
+                        className="w-12 h-12 rounded-lg object-contain bg-white p-1 flex-shrink-0"
                       />
                       <div className="min-w-0">
-                        <span className="inline-block text-[10px] font-semibold px-1.5 py-0.2 rounded bg-amber-400/10 text-amber-400 mb-1">
+                        <span className="text-[10px] font-mono font-bold text-amber-400 block truncate">
                           {sample.loja}
                         </span>
-                        <h4 className="text-xs font-bold text-white truncate group-hover:text-amber-300">
+                        <h4 className="text-xs font-bold text-white truncate">
                           {sample.nome}
                         </h4>
-                        <p className="text-[11px] text-emerald-400 font-semibold mt-0.5">
+                        <p className="text-[11px] text-emerald-400 font-bold mt-0.5 font-mono">
                           R$ {sample.expectedData.preco.toFixed(2)} / {sample.expectedData.unidade}
                         </p>
                       </div>
@@ -475,26 +637,153 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
             </div>
           )}
 
-          {/* STEP 2: PROCESSING (AI Multimodal OCR) */}
+          {/* STEP 2 (NOVO): BATCH PREVIEW — RESOLVE O PROBLEMA DE SINAL E TEMPO NA LOJA */}
+          {step === 'batch_preview' && (
+            <div className="space-y-5">
+              {/* Feedback de Sucesso se salvou na fila */}
+              {batchSavedSuccess !== null ? (
+                <div className="py-12 text-center space-y-3 animate-fade-in">
+                  <div className="w-16 h-16 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center mx-auto border-2 border-emerald-500/40">
+                    <Check className="w-8 h-8 stroke-[3]" />
+                  </div>
+                  <h3 className="text-lg font-bold text-white">
+                    {batchSavedSuccess} {batchSavedSuccess === 1 ? 'Foto Salva' : 'Fotos Salvas'} com Sucesso!
+                  </h3>
+                  <p className="text-xs text-slate-300 max-w-md mx-auto">
+                    As fotos foram guardadas com segurança na sua <strong>Fila Offline</strong>. Você não precisa esperar na loja! Quando estiver no Wi-Fi, basta abrir a fila e sincronizar todas com IA.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Banner de Orientação para Loja com Sinal Ruim */}
+                  <div className="p-4 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-start gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-amber-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0 mt-0.5">
+                      <Zap className="w-5 h-5" />
+                    </div>
+                    <div className="space-y-1">
+                      <h3 className="text-sm font-bold text-amber-300">
+                        {selectedPhotos.length} {selectedPhotos.length === 1 ? 'Foto Pronta' : 'Fotos Prontas'} para Processamento
+                      </h3>
+                      <p className="text-xs text-slate-300 leading-relaxed">
+                        Se estiver dentro do depósito ou loja com sinal 4G/5G fraco, escolha <strong>"Guardar na Fila Offline"</strong>. O app salva tudo no celular instantaneamente para você analisar com IA depois no Wi-Fi sem perder tempo na loja!
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Grade de Miniaturas das Fotos */}
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-xs text-slate-400">
+                      <span>Fotos Selecionadas ({selectedPhotos.length}):</span>
+                      <button
+                        onClick={() => {
+                          setSelectedPhotos([]);
+                          setStep('capture');
+                        }}
+                        className="text-slate-400 hover:text-white"
+                      >
+                        Limpar e Escolher Outras
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-5 gap-3 max-h-56 overflow-y-auto p-1">
+                      {selectedPhotos.map((imgUrl, idx) => (
+                        <div
+                          key={idx}
+                          className={`relative rounded-xl overflow-hidden border-2 bg-slate-950 group ${
+                            activePhotoIndex === idx
+                              ? 'border-amber-400 ring-2 ring-amber-400/20'
+                              : 'border-slate-800'
+                          }`}
+                        >
+                          <img
+                            src={imgUrl}
+                            alt={`Foto ${idx + 1}`}
+                            className="w-full h-24 object-cover"
+                          />
+                          <span className="absolute top-1 left-1 px-1.5 py-0.2 rounded bg-slate-950/80 text-[10px] font-mono text-white font-bold">
+                            #{idx + 1}
+                          </span>
+                          <button
+                            onClick={() => {
+                              const updated = selectedPhotos.filter((_, i) => i !== idx);
+                              setSelectedPhotos(updated);
+                              if (updated.length === 0) setStep('capture');
+                            }}
+                            className="absolute top-1 right-1 p-1 rounded-full bg-rose-950/80 text-rose-400 hover:bg-rose-600 hover:text-white transition-colors"
+                            title="Remover foto"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Loja Vinculada */}
+                  <div className="p-3 bg-[#0f172a] rounded-xl border border-slate-800 flex items-center justify-between">
+                    <span className="text-xs text-slate-300 flex items-center gap-2">
+                      <Building2 className="w-4 h-4 text-amber-400" />
+                      Loja Associada:
+                    </span>
+                    <strong className="text-amber-400 text-xs font-semibold">
+                      {selectedStoreHint || 'Loja Física / Não especificada'}
+                    </strong>
+                  </div>
+
+                  {/* DUAS AÇÕES PRINCIPAIS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+                    {/* AÇÃO 1: GUARDAR OFFLINE (INSTANTÂNEO PARA O CANTEIRO) */}
+                    <button
+                      onClick={handleSaveAllToOfflineQueue}
+                      className="p-4 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs sm:text-sm flex flex-col items-center justify-center gap-1 shadow-lg shadow-emerald-500/20 active:scale-95 transition-all text-center"
+                    >
+                      <div className="flex items-center gap-2">
+                        <CloudUpload className="w-5 h-5 stroke-[2.5]" />
+                        <span>Guardar Todas na Fila Offline</span>
+                      </div>
+                      <span className="text-[11px] font-medium opacity-90">
+                        1 segundo • Sem espera • Analisa depois no Wi-Fi
+                      </span>
+                    </button>
+
+                    {/* AÇÃO 2: ANALISAR COM IA AGORA (SE TIVER INTERNET) */}
+                    <button
+                      onClick={() => handleStartAnalysisForPhoto(0)}
+                      className="p-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs sm:text-sm flex flex-col items-center justify-center gap-1 border border-slate-700 active:scale-95 transition-all text-center"
+                    >
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-5 h-5 text-amber-400" />
+                        <span>Analisar com IA Agora (Online)</span>
+                      </div>
+                      <span className="text-[11px] text-slate-400 font-normal">
+                        Requer sinal de internet estável
+                      </span>
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+
+          {/* STEP 3: PROCESSING */}
           {step === 'processing' && (
-            <div className="py-12 flex flex-col items-center justify-center text-center space-y-4">
+            <div className="py-16 flex flex-col items-center justify-center text-center space-y-4">
               <div className="relative">
                 <div className="w-20 h-20 rounded-full border-4 border-amber-500/20 border-t-amber-400 animate-spin flex items-center justify-center" />
                 <Sparkles className="w-8 h-8 text-amber-400 absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 animate-pulse" />
               </div>
               <div className="space-y-1">
-                <h3 className="text-base font-bold text-white">Analisando etiqueta com IA...</h3>
+                <h3 className="text-base font-bold text-white">Lendo dados da etiqueta com IA...</h3>
                 <p className="text-xs text-slate-400 max-w-sm">
-                  Decodificando fabricante, modelo, dimensões, preços à vista/parcelado, código de barras e unidade de venda.
+                  Decodificando fabricante, modelo, preços à vista/parcelado, código de barras e unidade.
                 </p>
               </div>
             </div>
           )}
 
-          {/* STEP 3: CONFIRM & HUMAN VALIDATION */}
+          {/* STEP 4: CONFIRM */}
           {step === 'confirm' && (
             <div className="space-y-5">
-              {/* OCR Error notice if any */}
               {ocrError && (
                 <div className="p-3 bg-amber-950/40 border border-amber-800/60 rounded-xl flex items-start gap-2.5 text-xs text-amber-300">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0 text-amber-400 mt-0.5" />
@@ -504,54 +793,38 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                 </div>
               )}
 
-              {/* Deduplication Warning Alert Banner (Requisito Seção 3.3) */}
+              {/* Deduplication Alert */}
               {duplicateMaterial && (
-                <div className="p-4 bg-blue-950/50 border border-blue-700/60 rounded-xl space-y-3">
-                  <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center flex-shrink-0 mt-0.5">
-                      <History className="w-4 h-4" />
-                    </div>
+                <div className="p-3.5 bg-sky-950/50 border border-sky-700/60 rounded-xl space-y-2.5">
+                  <div className="flex items-start gap-2.5">
+                    <History className="w-4 h-4 text-sky-400 mt-0.5 flex-shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-bold uppercase tracking-wider text-blue-400">
-                          Produto Já Cadastrado na sua Base!
-                        </span>
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-blue-800 text-blue-200">
-                          Deduplicação Inteligente
-                        </span>
-                      </div>
-                      <p className="text-xs text-slate-200 mt-0.5">
-                        O modelo <strong>"{duplicateMaterial.nome}"</strong> já existe cadastrado.
-                        Preço anterior registrado: <strong className="text-emerald-400">R$ {duplicateMaterial.precoAtual.toFixed(2)}</strong> na loja <em>{duplicateMaterial.lojaAtual}</em>.
-                      </p>
-                      <p className="text-[11px] text-slate-400 mt-1">
-                        Novo preço capturado hoje: <strong>R$ {Number(preco || 0).toFixed(2)}</strong> em <em>{loja || 'loja física'}</em>.
+                      <span className="text-xs font-bold uppercase tracking-wider text-sky-400 block">
+                        Item já existente no catálogo: "{duplicateMaterial.nome}"
+                      </span>
+                      <p className="text-xs text-slate-300 mt-0.5">
+                        Preço anterior: <strong className="text-emerald-400">R$ {duplicateMaterial.precoAtual.toFixed(2)}</strong> na loja <em>{duplicateMaterial.lojaAtual}</em>.
                       </p>
                     </div>
                   </div>
-
-                  <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-blue-800/40">
-                    <button
-                      type="button"
-                      onClick={handleUpdateExistingPrice}
-                      className="px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow transition-colors flex items-center gap-1.5"
-                    >
-                      <History className="w-3.5 h-3.5" />
-                      Registrar no Histórico de Preços (Recomendado)
-                    </button>
-                    <span className="text-[11px] text-slate-400">ou preencha abaixo para salvar como item separado:</span>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={handleUpdateExistingPrice}
+                    className="px-3.5 py-1.5 rounded-lg bg-sky-600 hover:bg-sky-500 text-white font-bold text-xs transition-colors flex items-center gap-1.5 shadow"
+                  >
+                    <History className="w-3.5 h-3.5" />
+                    Registrar Novo Preço no Histórico
+                  </button>
                 </div>
               )}
 
-              {/* Grid: Image preview on side + Validation form */}
               <div className="grid grid-cols-1 md:grid-cols-12 gap-5">
-                {/* Left col: Tag photo thumbnail */}
+                {/* Thumbnail */}
                 <div className="md:col-span-4 space-y-3">
                   <div className="rounded-xl overflow-hidden border border-slate-700 bg-slate-950 p-2 text-center">
-                    {capturedImage ? (
+                    {selectedPhotos[activePhotoIndex] ? (
                       <img
-                        src={capturedImage}
+                        src={selectedPhotos[activePhotoIndex]}
                         alt="Etiqueta capturada"
                         className="w-full max-h-56 object-contain rounded-lg"
                       />
@@ -563,11 +836,9 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                     )}
                   </div>
                   {ocrConfidence !== undefined && (
-                    <div className="flex items-center justify-between text-[11px] px-2 text-slate-400">
-                      <span>Confiança da Leitura IA:</span>
-                      <span className="font-semibold text-emerald-400">
-                        {Math.round(ocrConfidence * 100)}%
-                      </span>
+                    <div className="flex items-center justify-between text-[11px] px-1 text-slate-400 font-mono">
+                      <span>Confiança IA:</span>
+                      <strong className="text-emerald-400">{Math.round(ocrConfidence * 100)}%</strong>
                     </div>
                   )}
                   <button
@@ -575,13 +846,12 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                     onClick={() => setStep('capture')}
                     className="w-full py-1.5 rounded-lg border border-slate-700 text-xs text-slate-300 hover:bg-slate-800 transition-colors"
                   >
-                    Fotografar Outra Etiqueta
+                    Fotografar / Selecionar Outra
                   </button>
                 </div>
 
-                {/* Right col: Form fields with human validation */}
-                <div className="md:col-span-8 space-y-4">
-                  {/* Fabricante e Loja */}
+                {/* Form */}
+                <div className="md:col-span-8 space-y-3.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
@@ -592,7 +862,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                         value={fabricante}
                         onChange={(e) => setFabricante(e.target.value)}
                         placeholder="Ex: Portobello, Tigre, Suvinil"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white focus:border-amber-400 outline-none"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-400 outline-none"
                       />
                     </div>
                     <div>
@@ -603,13 +873,12 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                         type="text"
                         value={loja}
                         onChange={(e) => setLoja(e.target.value)}
-                        placeholder="Ex: Leroy Merlin Morumbi"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white focus:border-amber-400 outline-none"
+                        placeholder="Ex: Obramax Mooca"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-400 outline-none"
                       />
                     </div>
                   </div>
 
-                  {/* Modelo / Descrição completa */}
                   <div>
                     <label className="block text-xs font-semibold text-slate-300 mb-1">
                       Modelo / Descrição / Dimensões *
@@ -618,15 +887,14 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                       type="text"
                       value={modelo}
                       onChange={(e) => setModelo(e.target.value)}
-                      placeholder="Ex: Porcelanato Bianco di Lucca Polido 84x84cm Retificado"
-                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs sm:text-sm text-white focus:border-amber-400 outline-none"
+                      placeholder="Ex: Porcelanato Bianco di Lucca Polido 84x84cm"
+                      className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white focus:border-amber-400 outline-none"
                     />
                   </div>
 
-                  {/* Preços e Unidade */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-800/40 p-3 rounded-xl border border-slate-700/60">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 bg-slate-800/40 p-3 rounded-xl border border-slate-700/60">
                     <div>
-                      <label className="block text-[11px] font-semibold text-amber-400 mb-1">
+                      <label className="block text-[11px] font-bold text-amber-400 mb-1">
                         Preço Unitário (R$) *
                       </label>
                       <input
@@ -635,7 +903,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                         value={preco}
                         onChange={(e) => setPreco(e.target.value === '' ? '' : parseFloat(e.target.value))}
                         placeholder="0.00"
-                        className="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-2.5 py-1.5 text-sm font-bold text-amber-400 outline-none focus:border-amber-400"
+                        className="w-full bg-slate-900 border border-amber-500/50 rounded-lg px-2.5 py-1.5 text-sm font-black text-amber-400 outline-none"
                       />
                     </div>
 
@@ -646,23 +914,23 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                       <select
                         value={unidade}
                         onChange={(e) => setUnidade(e.target.value)}
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-amber-400"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 outline-none"
                       >
-                        <option value="m²">m² (Metro quadrado)</option>
-                        <option value="cx">cx (Caixa)</option>
-                        <option value="un">un (Unidade / Peça)</option>
-                        <option value="kg">kg (Quilograma)</option>
+                        <option value="m²">m²</option>
+                        <option value="cx">cx</option>
+                        <option value="un">un</option>
+                        <option value="kg">kg</option>
                         <option value="litro">litro</option>
-                        <option value="lata">lata (18L / 3.6L)</option>
-                        <option value="saco">saco (20kg / 50kg)</option>
-                        <option value="rolo">rolo (100m)</option>
-                        <option value="m">m (Metro linear)</option>
+                        <option value="lata">lata</option>
+                        <option value="saco">saco</option>
+                        <option value="rolo">rolo</option>
+                        <option value="m">m</option>
                       </select>
                     </div>
 
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                        Preço Caixa/Embalagem
+                        Preço Embalagem
                       </label>
                       <input
                         type="number"
@@ -670,13 +938,13 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                         value={precoPorEmbalagem}
                         onChange={(e) => setPrecoPorEmbalagem(e.target.value === '' ? '' : parseFloat(e.target.value))}
                         placeholder="R$ Opcional"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 outline-none"
                       />
                     </div>
 
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-400 mb-1">
-                        m² / Peças por Cx
+                        Rendimento/Cx
                       </label>
                       <input
                         type="number"
@@ -684,13 +952,12 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                         value={coberturaPorEmbalagem}
                         onChange={(e) => setCoberturaPorEmbalagem(e.target.value === '' ? '' : parseFloat(e.target.value))}
                         placeholder="Ex: 1.96"
-                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 outline-none"
+                        className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2 py-1.5 text-xs text-slate-200 outline-none"
                       />
                     </div>
                   </div>
 
-                  {/* Taxonomia Hierárquica: Classe -> Categoria -> Tipo */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
                         Classe *
@@ -701,12 +968,10 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                           const newCl = e.target.value;
                           setClasse(newCl);
                           const clObj = taxonomia.find((c) => c.nome === newCl);
-                          const firstCat = clObj?.categorias[0]?.nome || '';
-                          setCategoria(firstCat);
-                          const firstTipo = clObj?.categorias[0]?.tipos[0]?.nome || '';
-                          setTipo(firstTipo);
+                          setCategoria(clObj?.categorias[0]?.nome || '');
+                          setTipo(clObj?.categorias[0]?.tipos[0]?.nome || '');
                         }}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white outline-none focus:border-amber-400"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
                       >
                         {taxonomia.map((c) => (
                           <option key={c.id} value={c.nome}>
@@ -728,7 +993,7 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
                           const catObj = availableCategorias.find((c) => c.nome === newCat);
                           setTipo(catObj?.tipos[0]?.nome || '');
                         }}
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white outline-none focus:border-amber-400"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
                       >
                         {availableCategorias.map((cat) => (
                           <option key={cat.id} value={cat.nome}>
@@ -740,45 +1005,46 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Tipo de Material
+                        Tipo
                       </label>
                       <input
                         type="text"
                         value={tipo}
                         onChange={(e) => setTipo(e.target.value)}
                         placeholder="Ex: Porcelanato Polido"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2 text-xs text-white outline-none focus:border-amber-400"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
                       />
                     </div>
                   </div>
 
-                  {/* Código de barras e Observações */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  {/* Código de barras e Observações Técnicas */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
                         Código de Barras / EAN
                       </label>
-                      <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-2">
+                      <div className="flex items-center bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5">
                         <Barcode className="w-4 h-4 text-slate-400 mr-2 flex-shrink-0" />
                         <input
                           type="text"
                           value={codigoBarras}
                           onChange={(e) => setCodigoBarras(e.target.value)}
                           placeholder="789..."
-                          className="w-full bg-transparent text-xs text-white outline-none"
+                          className="w-full bg-transparent text-xs text-white outline-none font-mono"
                         />
                       </div>
                     </div>
+
                     <div className="sm:col-span-2">
                       <label className="block text-xs font-semibold text-slate-300 mb-1">
-                        Observações Técnicas / Detalhes
+                        Observações Técnicas / Aplicação
                       </label>
                       <input
                         type="text"
                         value={observacoes}
                         onChange={(e) => setObservacoes(e.target.value)}
-                        placeholder="Ex: Borda retificada, junta 1.5mm, PEI 4, pronta entrega"
-                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-xs text-white outline-none focus:border-amber-400"
+                        placeholder="Ex: Borda retificada, junta 1.5mm, pronta entrega"
+                        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-white outline-none"
                       />
                     </div>
                   </div>
@@ -788,8 +1054,8 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
           )}
         </div>
 
-        {/* Footer actions */}
-        <div className="px-5 py-3.5 border-t border-slate-800 bg-slate-900/90 flex items-center justify-between">
+        {/* Footer */}
+        <div className="px-5 py-3.5 border-t border-slate-800 bg-[#0e1424] flex items-center justify-between">
           <button
             type="button"
             onClick={() => {
@@ -798,20 +1064,18 @@ export const CaptureModal: React.FC<CaptureModalProps> = ({
             }}
             className="px-4 py-2 rounded-xl text-slate-400 hover:text-white text-xs font-semibold"
           >
-            Cancelar
+            Fechar
           </button>
 
           {step === 'confirm' && (
-            <div className="flex items-center gap-3">
-              <button
-                type="button"
-                onClick={handleSaveNewMaterial}
-                className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs sm:text-sm shadow-lg shadow-amber-500/20 active:scale-95 transition-all flex items-center gap-2"
-              >
-                <CheckCircle2 className="w-4 h-4" />
-                <span>Salvar Material no Catálogo</span>
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={handleSaveNewMaterial}
+              className="px-5 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-md active:scale-95 transition-all flex items-center gap-2"
+            >
+              <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+              <span>Salvar Material no Catálogo</span>
+            </button>
           )}
         </div>
       </div>

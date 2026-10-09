@@ -46,8 +46,9 @@ O sistema opera com o caso real da **Igreja Cristã Evangélica Nova Vida**, est
 
 O aplicativo é um **PWA (Progressive Web App) Offline-First**, o que significa que **ele funciona 100% no celular mesmo com o computador desligado e sem conexão à internet**:
 
-* **Link Seguro PWA (Cloudflare Tunnel Ativo):**  
-  👉 **`https://ext-fallen-administrative-bent.trycloudflare.com`**
+* **Link Seguro em Produção (VPS Oracle SGM / Dokploy):**  
+  👉 **`https://sgm.icenvsp.com.br`**  
+  *(Hospedado na VPS SGM via Dokploy com Traefik e SSL automático).*
 * **Deploy Cloud na Vercel:**  
   👉 Conectado automaticamente ao repositório GitHub `sandrofreitas-web/sistema_obras`.
   *(Configurado com `vercel.json` na raiz e em `src/frontend/` para build Vite com SPA fallback).*

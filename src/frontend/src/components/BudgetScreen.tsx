@@ -10,7 +10,6 @@ import {
   ChevronDown,
   ChevronRight,
   Search,
-  Filter,
   Building,
   Tag,
   Droplets,
@@ -23,16 +22,19 @@ import {
   CheckCircle2,
   Clock,
   Sparkles,
-  SlidersHorizontal,
-  FolderOpen,
-  ShoppingBag,
   ListChecks,
-  Download,
+  Sliders,
+  TrendingUp,
+  Percent,
   Check,
+  X,
+  FileText,
+  Eye
 } from 'lucide-react';
 import { Projeto, ItemProjeto, Material, TaxonomiaClasse } from '../types';
 import { storageService } from '../services/storageService';
 import { ProjectItemModal } from './ProjectItemModal';
+import { WbsItemInspector } from './WbsItemInspector';
 
 interface BudgetScreenProps {
   project: Projeto | null;
@@ -44,6 +46,7 @@ interface BudgetScreenProps {
   onOpenCatalog: () => void;
   onOpenPrintBudget: () => void;
   onOpenAddMaterialToRoom?: (ambienteId: string) => void;
+  editModeEnabled?: boolean;
 }
 
 // Icon helper for groups
@@ -61,8 +64,7 @@ const getGroupIcon = (classeNome: string) => {
   return <Tag className="w-4 h-4 text-slate-400" />;
 };
 
-// Helpers de formatação no padrão brasileiro (pt-BR)
-// 1. Nos cards de resumo/telemetria: mantém R$ (ex: R$ 1.250,50)
+// Formatação brasileira pt-BR
 const formatCurrencyBR = (val: number): string => {
   return (val || 0).toLocaleString('pt-BR', {
     style: 'currency',
@@ -70,7 +72,6 @@ const formatCurrencyBR = (val: number): string => {
   });
 };
 
-// 2. Nas listas e tabelas de itens/subtotais: sem R$, com separador de milhar e vírgula decimal (ex: 1.250,50)
 const formatNumberBR = (val: number): string => {
   return (val || 0).toLocaleString('pt-BR', {
     minimumFractionDigits: 2,
@@ -87,11 +88,12 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
   onProjectUpdated,
   onOpenCatalog,
   onOpenPrintBudget,
+  editModeEnabled = true,
 }) => {
   if (!project) {
     return (
-      <div className="py-12 text-center text-slate-400">
-        <p>Nenhum projeto selecionado.</p>
+      <div className="py-16 text-center text-slate-400">
+        <p>Nenhum projeto de obra selecionado.</p>
       </div>
     );
   }
@@ -102,38 +104,40 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
 
   const items = currentScenario?.itens || [];
 
+  // Sub-aba ativa dentro da visão de Orçamento
+  const [subTab, setSubTab] = useState<'wbs' | 'proposta' | 'compras'>('wbs');
+
   // Filter & Search States
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('todos');
   const [selectedAmbienteFilter, setSelectedAmbienteFilter] = useState<string>('todos');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<'todos' | 'planejado' | 'comprado'>('todos');
-  // Iniciar carga da página pela vista de Ambiente por padrão
-  const [viewMode, setViewMode] = useState<'ambientes' | 'grupos'>('ambientes');
+  const [groupingMode, setGroupingMode] = useState<'etapas' | 'ambientes'>('etapas');
 
-  // Accordion Expanded State for Groups (iniciam recolhidos por padrão)
-  const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
-  // Accordion Expanded State for Rooms (iniciam expandidos por padrão)
-  const [expandedRooms, setExpandedRooms] = useState<Record<string, boolean>>({});
+  // Accordion Expanded State
+  const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
 
   // Item Modal State (Create / Edit)
   const [isItemModalOpen, setIsItemModalOpen] = useState(false);
   const [itemModalMode, setItemModalMode] = useState<'create' | 'edit'>('create');
   const [itemToEdit, setItemToEdit] = useState<ItemProjeto | null>(null);
   const [preselectedGroupForNewItem, setPreselectedGroupForNewItem] = useState<string>('');
+  const [preselectedCategoryForNewItem, setPreselectedCategoryForNewItem] = useState<string>('');
+  const [preselectedAmbienteForNewItem, setPreselectedAmbienteForNewItem] = useState<string>('');
 
-  // Toggle group accordion (iniciam recolhidos por padrão)
-  const toggleGroup = (grupoNome: string) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [grupoNome]: !prev[grupoNome],
-    }));
-  };
+  // Item Inspetor State (Opção 2 - Lateral Drawer)
+  const [selectedInspectorItem, setSelectedInspectorItem] = useState<ItemProjeto | null>(null);
+  const [selectedItemCode, setSelectedItemCode] = useState<string>('');
 
-  // Toggle room accordion
-  const toggleRoom = (roomId: string) => {
-    setExpandedRooms((prev) => ({
+  // BDI Inline Editing State
+  const [isEditingBdi, setIsEditingBdi] = useState(false);
+  const [tempBdi, setTempBdi] = useState<string>(String(project.contingenciaPercent ?? 10));
+
+  // Toggle Section
+  const toggleSection = (id: string) => {
+    setExpandedSections((prev) => ({
       ...prev,
-      [roomId]: prev[roomId] === undefined ? false : !prev[roomId],
+      [id]: !prev[id],
     }));
   };
 
@@ -147,24 +151,10 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
   const materialsWithContingency = rawTotalActive + contingencyValue;
   const laborBudget = project.orcamentoMaoObra ?? 17000;
   const globalProjectBudget = materialsWithContingency + laborBudget;
-  const costPerM2 = project.areaTotalM2 > 0 ? globalProjectBudget / project.areaTotalM2 : 0;
-
-  // Acquisition Evolution & Shopping List Stats
-  const compradosCount = useMemo(() => items.filter((i) => i.comprado).length, [items]);
-  const totalComprado = useMemo(
-    () => items.filter((i) => i.comprado).reduce((acc, i) => acc + i.precoTotal, 0),
-    [items]
-  );
-  const totalPendente = useMemo(
-    () => items.filter((i) => !i.comprado).reduce((acc, i) => acc + i.precoTotal, 0),
-    [items]
-  );
-  const percentComprado = items.length > 0 ? (compradosCount / items.length) * 100 : 0;
 
   // Filter items according to search and filters
   const filteredItems = useMemo(() => {
     return items.filter((item) => {
-      // Search
       if (searchTerm.trim()) {
         const q = searchTerm.toLowerCase();
         const matchesName = item.materialNome.toLowerCase().includes(q);
@@ -179,17 +169,14 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         }
       }
 
-      // Group filter
       if (selectedGroupFilter !== 'todos' && item.classe !== selectedGroupFilter) {
         return false;
       }
 
-      // Room filter
       if (selectedAmbienteFilter !== 'todos' && item.ambienteId !== selectedAmbienteFilter) {
         return false;
       }
 
-      // Status filter
       if (selectedStatusFilter === 'comprado' && !item.comprado) return false;
       if (selectedStatusFilter === 'planejado' && item.comprado) return false;
 
@@ -197,59 +184,94 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
     });
   }, [items, searchTerm, selectedGroupFilter, selectedAmbienteFilter, selectedStatusFilter, project.ambientes]);
 
-  // Group items by Grupo (Classe) -> Categoria
-  const groupedData = useMemo(() => {
-    const groupsMap: Record<
-      string,
-      {
-        grupoNome: string;
-        subtotal: number;
-        totalItens: number;
-        categorias: Record<string, { categoriaNome: string; subtotal: number; itens: ItemProjeto[] }>;
-      }
-    > = {};
+  // Estrutura Analítica WBS (Nível 1: Macro-Etapas / Classes)
+  const wbsEtapasData = useMemo(() => {
+    const map: Record<string, { id: string; nome: string; itens: ItemProjeto[]; subtotal: number }> = {};
+
+    // Mapeia classes ordenadas por fluxo construtivo
+    const ordemClasses: string[] = [
+      'Caçambas & Serviços',
+      'Bruto / Estrutura',
+      'Hidráulica',
+      'Elétrica',
+      'Revestimento',
+      'Gesso & Drywall',
+      'Louças & Metais',
+      'Marmoraria & Divisórias',
+      'Pintura'
+    ];
 
     filteredItems.forEach((item) => {
-      const gName = item.classe || 'Geral';
-      if (!groupsMap[gName]) {
-        groupsMap[gName] = {
-          grupoNome: gName,
-          subtotal: 0,
-          totalItens: 0,
-          categorias: {},
-        };
-      }
-
-      groupsMap[gName].subtotal += item.precoTotal;
-      groupsMap[gName].totalItens += 1;
-
-      const cName = item.categoria || 'Geral';
-      if (!groupsMap[gName].categorias[cName]) {
-        groupsMap[gName].categorias[cName] = {
-          categoriaNome: cName,
-          subtotal: 0,
+      const cName = item.classe || 'Geral';
+      if (!map[cName]) {
+        map[cName] = {
+          id: cName,
+          nome: cName,
           itens: [],
+          subtotal: 0,
         };
       }
-
-      groupsMap[gName].categorias[cName].subtotal += item.precoTotal;
-      groupsMap[gName].categorias[cName].itens.push(item);
+      map[cName].itens.push(item);
+      map[cName].subtotal += item.precoTotal;
     });
 
-    return Object.values(groupsMap).sort((a, b) => b.subtotal - a.subtotal);
+    return Object.values(map).sort((a, b) => {
+      const idxA = ordemClasses.indexOf(a.nome);
+      const idxB = ordemClasses.indexOf(b.nome);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return b.subtotal - a.subtotal;
+    });
   }, [filteredItems]);
 
-  // Unique list of groups present in items or taxonomy for dropdown
-  const allGroups = useMemo(() => {
-    const set = new Set<string>();
-    items.forEach((i) => set.add(i.classe));
-    taxonomia.forEach((t) => set.add(t.nome));
-    return Array.from(set).sort();
-  }, [items, taxonomia]);
+  // Estrutura por Ambientes
+  const wbsAmbientesData = useMemo(() => {
+    const map: Record<string, { id: string; nome: string; itens: ItemProjeto[]; subtotal: number }> = {};
 
-  // --- CRUD & STATUS ACTIONS ---
+    project.ambientes.forEach((amb) => {
+      map[amb.id] = {
+        id: amb.id,
+        nome: amb.nome,
+        itens: [],
+        subtotal: 0,
+      };
+    });
 
-  // Direct toggle for status Comprado / Planejado
+    filteredItems.forEach((item) => {
+      const ambId = item.ambienteId || 'geral';
+      if (!map[ambId]) {
+        map[ambId] = {
+          id: ambId,
+          nome: 'Área Geral / Comum',
+          itens: [],
+          subtotal: 0,
+        };
+      }
+      map[ambId].itens.push(item);
+      map[ambId].subtotal += item.precoTotal;
+    });
+
+    return Object.values(map).filter((a) => a.itens.length > 0 || selectedAmbienteFilter === a.id);
+  }, [filteredItems, project.ambientes, selectedAmbienteFilter]);
+
+  // Expand / Collapse All
+  const handleExpandAll = () => {
+    const m: Record<string, boolean> = {};
+    wbsEtapasData.forEach((e) => (m[e.id] = true));
+    wbsAmbientesData.forEach((a) => (m[a.id] = true));
+    setExpandedSections(m);
+  };
+
+  const handleCollapseAll = () => {
+    const m: Record<string, boolean> = {};
+    wbsEtapasData.forEach((e) => (m[e.id] = false));
+    wbsAmbientesData.forEach((a) => (m[a.id] = false));
+    setExpandedSections(m);
+  };
+
+  // --- CRUD ACTIONS ---
+
   const handleToggleItemComprado = (itemId: string, currentStatus: boolean) => {
     if (!currentScenario) return;
 
@@ -275,32 +297,76 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
 
     storageService.saveProject(updatedProject);
     onProjectUpdated(updatedProject);
+
+    // Atualiza item selecionado no inspetor se for o mesmo
+    if (selectedInspectorItem && selectedInspectorItem.id === itemId) {
+      setSelectedInspectorItem({ ...selectedInspectorItem, comprado: !currentStatus });
+    }
   };
 
-  // Open modal to add item
-  const handleOpenAddItem = (preselectedClasse?: string) => {
+  const handleOpenAddItem = (
+    preselectedClasse?: string,
+    preselectedCategoria?: string,
+    preselectedAmbienteId?: string
+  ) => {
     setItemModalMode('create');
     setItemToEdit(null);
-    setPreselectedGroupForNewItem(preselectedClasse || '');
+
+    // Prioriza classe passada, senão herda filtro de grupo ativo se não for 'todos'
+    const targetClasse =
+      preselectedClasse || (selectedGroupFilter !== 'todos' ? selectedGroupFilter : '');
+
+    // Prioriza ambiente passado, senão herda filtro de ambiente ativo se não for 'todos'
+    const targetAmbiente =
+      preselectedAmbienteId || (selectedAmbienteFilter !== 'todos' ? selectedAmbienteFilter : '');
+
+    setPreselectedGroupForNewItem(targetClasse);
+    setPreselectedCategoryForNewItem(preselectedCategoria || '');
+    setPreselectedAmbienteForNewItem(targetAmbiente);
     setIsItemModalOpen(true);
   };
 
-  // Open modal to edit item
   const handleOpenEditItem = (item: ItemProjeto) => {
     setItemModalMode('edit');
     setItemToEdit(item);
     setPreselectedGroupForNewItem(item.classe);
+    setPreselectedCategoryForNewItem(item.categoria);
+    setPreselectedAmbienteForNewItem(item.ambienteId);
     setIsItemModalOpen(true);
   };
 
-  // Save (Create or Update)
+  const handleDeleteItem = (itemId: string) => {
+    if (!currentScenario) return;
+    if (!window.confirm('Deseja excluir este item do orçamento da obra?')) return;
+
+    const updatedItens = currentScenario.itens.filter((it) => it.id !== itemId);
+    const updatedCenarios = project.cenarios.map((cen) => {
+      if (cen.id === currentScenario.id) {
+        return { ...cen, itens: updatedItens };
+      }
+      return cen;
+    });
+
+    const updatedProject: Projeto = {
+      ...project,
+      cenarios: updatedCenarios,
+      atualizadoEm: new Date().toISOString(),
+    };
+
+    storageService.saveProject(updatedProject);
+    onProjectUpdated(updatedProject);
+
+    if (selectedInspectorItem?.id === itemId) {
+      setSelectedInspectorItem(null);
+    }
+  };
+
   const handleSaveItem = (itemData: any) => {
     if (!currentScenario) return;
 
     let updatedItens: ItemProjeto[];
 
     if (itemModalMode === 'edit' && itemData.id) {
-      // Update existing item
       updatedItens = currentScenario.itens.map((it) => {
         if (it.id === itemData.id) {
           return {
@@ -311,7 +377,6 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         return it;
       });
     } else {
-      // Create new item
       const newItem: ItemProjeto = {
         ...itemData,
         id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -322,10 +387,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
 
     const updatedCenarios = project.cenarios.map((cen) => {
       if (cen.id === currentScenario.id) {
-        return {
-          ...cen,
-          itens: updatedItens,
-        };
+        return { ...cen, itens: updatedItens };
       }
       return cen;
     });
@@ -339,1011 +401,709 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
     storageService.saveProject(updatedProject);
     onProjectUpdated(updatedProject);
     setIsItemModalOpen(false);
+
+    if (selectedInspectorItem && selectedInspectorItem.id === itemData.id) {
+      setSelectedInspectorItem({ ...selectedInspectorItem, ...itemData });
+    }
   };
 
-  // Delete item
-  const handleDeleteItem = (itemId: string, itemNome: string) => {
-    if (!confirm(`Deseja realmente remover o item "${itemNome}" do orçamento da obra?`)) {
+  // Salvar BDI Global
+  const handleSaveBdi = () => {
+    const parsed = parseFloat(tempBdi);
+    if (isNaN(parsed) || parsed < 0) {
+      alert('Informe um valor de BDI válido.');
       return;
     }
-
-    if (!currentScenario) return;
-
-    const updatedItens = currentScenario.itens.filter((i) => i.id !== itemId);
-    const updatedCenarios = project.cenarios.map((cen) => {
-      if (cen.id === currentScenario.id) {
-        return {
-          ...cen,
-          itens: updatedItens,
-        };
-      }
-      return cen;
-    });
-
     const updatedProject: Projeto = {
       ...project,
-      cenarios: updatedCenarios,
+      contingenciaPercent: parsed,
       atualizadoEm: new Date().toISOString(),
     };
-
     storageService.saveProject(updatedProject);
     onProjectUpdated(updatedProject);
+    setIsEditingBdi(false);
   };
 
-  // Update contingency margin
-  const handleUpdateContingency = (newVal: number) => {
-    const updated: Projeto = {
-      ...project,
-      contingenciaPercent: newVal,
-      atualizadoEm: new Date().toISOString(),
-    };
-    storageService.saveProject(updated);
-    onProjectUpdated(updated);
-  };
-
-  // Expand / Collapse all
-  const handleExpandAll = () => {
-    const expandedMap: Record<string, boolean> = {};
-    groupedData.forEach((g) => {
-      expandedMap[g.grupoNome] = true;
-    });
-    setExpandedGroups(expandedMap);
-
-    const roomsMap: Record<string, boolean> = {};
-    project.ambientes.forEach((a) => {
-      roomsMap[a.id] = true;
-    });
-    setExpandedRooms(roomsMap);
-  };
-
-  const handleCollapseAll = () => {
-    const collapsedMap: Record<string, boolean> = {};
-    groupedData.forEach((g) => {
-      collapsedMap[g.grupoNome] = false;
-    });
-    setExpandedGroups(collapsedMap);
-
-    const roomsMap: Record<string, boolean> = {};
-    project.ambientes.forEach((a) => {
-      roomsMap[a.id] = false;
-    });
-    setExpandedRooms(roomsMap);
-  };
-
-  // --- EXPORT FUNCTIONS ---
-
-  // Exportar Lista de Aquisição e Cotação de Fornecedores (CSV)
-  const handleExportCotacaoCSV = (onlyPending = false) => {
-    const listItems = onlyPending ? items.filter((i) => !i.comprado) : items;
-
+  // Exportar Planilha CSV
+  const handleExportCSV = () => {
     const rows = [
-      ['LISTA DE COMPRAS E MAPA DE COTAÇÃO DE MATERIAIS — OBRA ICENV 2026'],
-      ['PROJETO', project.nome],
-      ['PASTA DOCUMENTAL', project.pastaDocumentos || ''],
+      ['DETALHAMENTO EXECUTIVO DO ORÇAMENTO WBS — ' + project.nome],
+      ['CLIENTE / RESPONSÁVEL', project.cliente || 'ICENV 2026'],
+      ['BASE OFICIAL', 'SINAPI SP 2026 / PRÓPRIA'],
       ['DATA EMISSÃO', new Date().toLocaleDateString('pt-BR')],
-      ['FILTRO', onlyPending ? 'APENAS ITENS PENDENTES (A COMPRAR)' : 'TODOS OS ITENS'],
+      ['BDI GLOBAL', `${contingencyPercent}%`],
       [],
       [
-        'Status',
-        'Grupo / Classe',
-        'Categoria',
-        'Descrição do Material / Especificação',
-        'Fabricante Sugerido',
+        'Item',
+        'Etapa / Classe',
+        'Descrição do Material / Composição',
+        'Fabricante',
         'Ambiente',
         'Qtd Base',
         'Perda %',
-        'Qtd a Comprar (c/ Perda)',
+        'Qtd Final Compra',
         'Unidade',
-        'Preço Ref. Estimado (R$)',
-        'Total Estimado (R$)',
-        'Fornecedor / Loja Referência',
-        'Preço Cotado Real (R$)',
-        'Fornecedor Escolhido',
-        'Nº Pedido / NF',
-        'Observações de Compra',
+        'Custo Unitário (R$)',
+        'Custo Total (R$)',
+        'BDI %',
+        'Preço Unit. Venda (R$)',
+        'Preço Total Venda (R$)',
+        'Status',
+        'Loja Referência',
       ],
     ];
 
-    listItems.forEach((item) => {
-      const room = project.ambientes.find((a) => a.id === item.ambienteId)?.nome || 'Geral';
+    let macroIndex = 1;
+    wbsEtapasData.forEach((etapa) => {
       rows.push([
-        item.comprado ? 'COMPRADO' : 'PLANEJADO / A COMPRAR',
-        `"${item.classe}"`,
-        `"${item.categoria}"`,
-        `"${item.materialNome}"`,
-        `"${item.fabricante || ''}"`,
-        `"${room}"`,
-        String(item.quantidadeBase),
-        `${item.perdaTecnicaPercent}%`,
-        String(item.quantidadeComPerda),
-        item.unidade,
-        item.precoUnitario.toFixed(2),
-        item.precoTotal.toFixed(2),
-        `"${item.lojaReferencia || ''}"`,
-        '', // Coluna em branco para cotação na loja
-        '', // Coluna em branco para fornecedor
-        '', // Coluna em branco para nota fiscal
-        `"${item.observacoes || ''}"`,
+        `${macroIndex}.0`,
+        `"${etapa.nome.toUpperCase()}"`,
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        '',
+        etapa.subtotal.toFixed(2),
+        `${contingencyPercent}%`,
+        '',
+        (etapa.subtotal * (1 + contingencyPercent / 100)).toFixed(2),
+        '',
+        '',
       ]);
+
+      etapa.itens.forEach((it, subIdx) => {
+        const room = project.ambientes.find((a) => a.id === it.ambienteId)?.nome || 'Geral';
+        const precoUnitVenda = it.precoUnitario * (1 + contingencyPercent / 100);
+        const precoTotVenda = it.precoTotal * (1 + contingencyPercent / 100);
+
+        rows.push([
+          `${macroIndex}.${subIdx + 1}`,
+          `"${it.classe}"`,
+          `"${it.materialNome}"`,
+          `"${it.fabricante || ''}"`,
+          `"${room}"`,
+          String(it.quantidadeBase),
+          `${it.perdaTecnicaPercent}%`,
+          String(it.quantidadeComPerda),
+          it.unidade,
+          it.precoUnitario.toFixed(2),
+          it.precoTotal.toFixed(2),
+          `${contingencyPercent}%`,
+          precoUnitVenda.toFixed(2),
+          precoTotVenda.toFixed(2),
+          it.comprado ? 'COMPRADO' : 'PLANEJADO',
+          `"${it.lojaReferencia || ''}"`,
+        ]);
+      });
+      macroIndex++;
     });
 
-    const totalEstimado = listItems.reduce((acc, i) => acc + i.precoTotal, 0);
     rows.push([]);
-    rows.push(['TOTAL GERAL ESTIMADO', '', '', '', '', '', '', '', '', '', '', totalEstimado.toFixed(2)]);
+    rows.push(['TOTAL CUSTO DIRETO', '', '', '', '', '', '', '', '', '', rawTotalActive.toFixed(2)]);
+    rows.push(['BDI GLOBAL (%)', '', '', '', '', '', '', '', '', '', `${contingencyPercent}%`]);
+    rows.push(['MÃO DE OBRA CONTRATADA', '', '', '', '', '', '', '', '', '', laborBudget.toFixed(2)]);
+    rows.push(['PREÇO GLOBAL DA PROPOSTA', '', '', '', '', '', '', '', '', '', globalProjectBudget.toFixed(2)]);
 
     const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map((e) => e.join(';')).join('\n');
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement('a');
     link.setAttribute('href', encodedUri);
-    const filename = `lista_cotacao_${onlyPending ? 'pendentes_' : ''}${project.nome.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`;
+    const filename = `orcamento_wbs_${project.nome.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`;
     link.setAttribute('download', filename);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
-  // Exportar Planilha Completa Detalhada do Orçamento (CSV)
-  const handleExportCSV = () => {
-    const rows = [
-      ['DETALHAMENTO EXECUTIVO DO ORÇAMENTO — OBRA ICENV 2026'],
-      ['PROJETO', project.nome],
-      ['PASTA DOCUMENTOS', project.pastaDocumentos || ''],
-      ['DATA EXPORTACAO', new Date().toLocaleDateString('pt-BR')],
-      [],
-      [
-        'Status',
-        'Grupo / Classe',
-        'Categoria',
-        'Material / Descrição',
-        'Fabricante',
-        'Ambiente',
-        'Qtd Base',
-        'Perda %',
-        'Qtd Compra (Final)',
-        'Unidade',
-        'Preço Unitário (R$)',
-        'Total (R$)',
-        'Loja Referência',
-        'Observações',
-      ],
-    ];
-
-    groupedData.forEach((g) => {
-      Object.values(g.categorias).forEach((cat) => {
-        cat.itens.forEach((item) => {
-          const room = project.ambientes.find((a) => a.id === item.ambienteId)?.nome || 'Geral';
-          rows.push([
-            item.comprado ? 'Comprado' : 'Planejado',
-            `"${g.grupoNome}"`,
-            `"${cat.categoriaNome}"`,
-            `"${item.materialNome}"`,
-            `"${item.fabricante || ''}"`,
-            `"${room}"`,
-            String(item.quantidadeBase),
-            `${item.perdaTecnicaPercent}%`,
-            String(item.quantidadeComPerda),
-            item.unidade,
-            item.precoUnitario.toFixed(2),
-            item.precoTotal.toFixed(2),
-            `"${item.lojaReferencia || ''}"`,
-            `"${item.observacoes || ''}"`,
-          ]);
-        });
-      });
-    });
-
-    rows.push([]);
-    rows.push(['SUBTOTAL MATERIAIS', '', '', '', '', '', '', '', '', '', rawTotalActive.toFixed(2)]);
-    rows.push([`CONTINGENCIA / RESERVA (${contingencyPercent}%)`, '', '', '', '', '', '', '', '', '', contingencyValue.toFixed(2)]);
-    rows.push(['TOTAL MATERIAIS COM MARGEM', '', '', '', '', '', '', '', '', '', materialsWithContingency.toFixed(2)]);
-    rows.push(['MAO DE OBRA WAGNER', '', '', '', '', '', '', '', '', '', laborBudget.toFixed(2)]);
-    rows.push(['CUSTO GLOBAL DA OBRA', '', '', '', '', '', '', '', '', '', globalProjectBudget.toFixed(2)]);
-
-    const csvContent = 'data:text/csv;charset=utf-8,\uFEFF' + rows.map((e) => e.join(';')).join('\n');
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement('a');
-    link.setAttribute('href', encodedUri);
-    link.setAttribute('download', `orcamento_executivo_${project.nome.toLowerCase().replace(/[^a-z0-9]/g, '_')}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
+  const activeSections = groupingMode === 'etapas' ? wbsEtapasData : wbsAmbientesData;
 
   return (
-    <div className="space-y-5 pb-20">
-      {/* Sequential Phase Switcher Bar */}
-      {projects && projects.length > 1 && onSelectProject && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-2.5 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 shadow-sm">
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 sm:pb-0">
-            <span className="text-xs font-black text-amber-400 uppercase tracking-wider flex items-center gap-1.5 mr-1 flex-shrink-0">
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              Execução Sequencial:
-            </span>
+    <div className="flex-1 flex flex-col h-full overflow-hidden select-none relative bg-[#060911]">
+      {/* 1. Barra de Sub-Abas do Projeto (Estilo ERP Sienge/Mais Controle da Referência) */}
+      <div className="h-10 bg-[#090d16] border-b border-slate-800/90 px-4 flex items-center justify-between flex-shrink-0">
+        <div className="flex items-center gap-1 sm:gap-2 h-full">
+          <button
+            onClick={() => setSubTab('wbs')}
+            className={`h-full px-3.5 flex items-center gap-2 text-xs font-bold transition-all relative ${
+              subTab === 'wbs'
+                ? 'text-sky-400 font-extrabold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <Calculator className="w-3.5 h-3.5" />
+            <span>Orçamento (WBS)</span>
+            {subTab === 'wbs' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-sky-400 shadow-sm shadow-sky-400/50" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setSubTab('proposta')}
+            className={`h-full px-3.5 flex items-center gap-2 text-xs font-bold transition-all relative ${
+              subTab === 'proposta'
+                ? 'text-sky-400 font-extrabold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <TrendingUp className="w-3.5 h-3.5" />
+            <span>Proposta Comercial</span>
+            {subTab === 'proposta' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-sky-400 shadow-sm shadow-sky-400/50" />
+            )}
+          </button>
+
+          <button
+            onClick={() => setSubTab('compras')}
+            className={`h-full px-3.5 flex items-center gap-2 text-xs font-bold transition-all relative ${
+              subTab === 'compras'
+                ? 'text-sky-400 font-extrabold'
+                : 'text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <ListChecks className="w-3.5 h-3.5" />
+            <span>Mapa de Cotação</span>
+            {subTab === 'compras' && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-sky-400 shadow-sm shadow-sky-400/50" />
+            )}
+          </button>
+        </div>
+
+        {/* Seletor de Fase Sequencial da Obra */}
+        {projects && projects.length > 1 && onSelectProject && (
+          <div className="hidden md:flex items-center gap-1.5 text-xs">
+            <span className="text-[10px] font-mono uppercase text-slate-400 font-bold">Fase da Obra:</span>
             {projects.map((p, idx) => {
               const isActive = p.id === project.id;
-              const isPastoral = p.id.includes('pastoral') || p.nome.includes('Pastoral');
               return (
                 <button
                   key={p.id}
                   onClick={() => onSelectProject(p.id)}
-                  className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all flex items-center gap-2 whitespace-nowrap ${
+                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold transition-colors ${
                     isActive
-                      ? 'bg-amber-400 text-slate-950 shadow-md font-black scale-[1.02]'
-                      : 'bg-slate-800 text-slate-300 hover:text-white hover:bg-slate-700 border border-slate-700/60'
+                      ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
+                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
                   }`}
                 >
-                  <span className={`w-2 h-2 rounded-full ${isPastoral ? 'bg-emerald-500' : 'bg-blue-400'}`} />
-                  <span>{idx + 1}ª Fase: {isPastoral ? 'Banheiro Casa Pastoral' : 'Banheiro Masculino'}</span>
-                  <span
-                    className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
-                      isActive ? 'bg-slate-950/20 text-slate-900' : 'bg-slate-900 text-slate-400'
-                    }`}
-                  >
-                    {isPastoral ? 'Fase Inicial (Em Andamento)' : 'Fase 2 (Sequencial)'}
-                  </span>
+                  {idx + 1}ª Fase ({p.id.includes('pastoral') ? 'Casa Pastoral' : 'Banheiro Masculino'})
                 </button>
               );
             })}
           </div>
-          <span className="text-[11px] text-slate-400 font-medium">
-            🎯 Início: <strong>13/10/2026</strong> pela Casa Pastoral
-          </span>
-        </div>
-      )}
-
-      {/* Painel Executivo do Projeto — Estilo Técnico de Engenharia */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-4 sm:p-5 shadow-sm space-y-3.5">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          <div className="space-y-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 uppercase tracking-wider font-mono">
-                {project.status === 'em_andamento' ? 'Fase 1 — Em Execução' : 'Fase 2 — Sequencial'}
-              </span>
-              <span className="text-xs text-slate-400 flex items-center gap-1 font-mono">
-                <Building className="w-3.5 h-3.5 text-slate-400" />
-                Área: <strong className="text-white">{project.areaTotalM2} m²</strong>
-              </span>
-              {project.pastaDocumentos && (
-                <span className="text-[11px] text-amber-400/90 flex items-center gap-1 bg-slate-950 px-2 py-0.5 rounded border border-slate-800 font-mono">
-                  <FolderOpen className="w-3 h-3 text-amber-400" />
-                  {project.pastaDocumentos}
-                </span>
-              )}
-            </div>
-
-            <h1 className="text-lg sm:text-xl font-black text-white tracking-tight">
-              {project.nome}
-            </h1>
-            <p className="text-xs text-slate-400 max-w-3xl leading-relaxed">
-              {project.descricao}
-            </p>
-          </div>
-
-          {/* Botões de Ação Rápidos Compactos */}
-          <div className="flex items-center gap-2 flex-wrap self-start lg:self-auto">
-            <button
-              onClick={() => handleOpenAddItem()}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow active:scale-95 transition-all"
-            >
-              <Plus className="w-4 h-4 stroke-[2.5]" />
-              <span>+ Incluir Item</span>
-            </button>
-
-            <button
-              onClick={() => handleExportCotacaoCSV(false)}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/40 text-xs font-semibold text-emerald-300 transition-colors"
-              title="Exportar Lista para Cotação e Compras em Lojas"
-            >
-              <ListChecks className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Lista de Cotação</span>
-            </button>
-
-            <button
-              onClick={handleExportCSV}
-              className="flex items-center gap-1.5 px-3 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-xs font-semibold text-slate-200 transition-colors"
-              title="Exportar Planilha Completa do Orçamento"
-            >
-              <FileSpreadsheet className="w-3.5 h-3.5 text-slate-300" />
-              <span>Orçamento CSV</span>
-            </button>
-
-            <button
-              onClick={onOpenPrintBudget}
-              className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700/80 text-xs font-semibold text-slate-200 transition-colors"
-              title="Visualizar Impressão ou Gerar PDF Executivo"
-            >
-              <Printer className="w-3.5 h-3.5 text-amber-400" />
-              <span>PDF</span>
-            </button>
-          </div>
-        </div>
-
-        {/* Barra de Telemetria Financeira e Aquisições Integrada (Menos cards, mais dados em linha) */}
-        <div className="grid grid-cols-2 md:grid-cols-5 border border-slate-800 rounded-lg overflow-hidden divide-y md:divide-y-0 md:divide-x divide-slate-800/80 bg-slate-950/70 text-xs">
-          {/* 1. Subtotal Insumos */}
-          <div className="p-3 space-y-0.5">
-            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
-              1. Insumos Base
-            </span>
-            <div className="text-base sm:text-lg font-black text-white font-mono tabular-nums">
-              {formatCurrencyBR(rawTotalActive)}
-            </div>
-            <span className="text-[10px] text-slate-500 font-mono block">
-              {items.length} itens • {groupedData.length} grupos
-            </span>
-          </div>
-
-          {/* 2. Reserva Técnica */}
-          <div className="p-3 space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono text-amber-400/90 uppercase tracking-wider">
-                2. Margem Técnica
-              </span>
-              <span className="text-[10px] font-bold text-amber-400 font-mono">
-                {contingencyPercent}%
-              </span>
-            </div>
-            <div className="text-base sm:text-lg font-black text-amber-300 font-mono tabular-nums">
-              + {formatCurrencyBR(contingencyValue)}
-            </div>
-            <input
-              type="range"
-              min="0"
-              max="25"
-              step="5"
-              value={contingencyPercent}
-              onChange={(e) => handleUpdateContingency(parseInt(e.target.value, 10))}
-              className="w-full accent-amber-400 h-1 cursor-pointer block"
-              title="Ajustar margem técnica"
-            />
-          </div>
-
-          {/* 3. Materiais c/ Margem */}
-          <div className="p-3 space-y-0.5">
-            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
-              3. Insumos c/ Margem
-            </span>
-            <div className="text-base sm:text-lg font-black text-emerald-400 font-mono tabular-nums">
-              {formatCurrencyBR(materialsWithContingency)}
-            </div>
-            <span className="text-[10px] text-slate-500 font-mono block">
-              Previsão de materiais
-            </span>
-          </div>
-
-          {/* 4. Mão de Obra Wagner */}
-          <div className="p-3 space-y-0.5">
-            <span className="text-[10px] font-mono text-slate-400 uppercase tracking-wider block">
-              4. Mão de Obra Wagner
-            </span>
-            <div className="text-base sm:text-lg font-black text-sky-400 font-mono tabular-nums">
-              {formatCurrencyBR(laborBudget)}
-            </div>
-            <span className="text-[10px] text-slate-500 font-mono block">
-              Contrato empreitada
-            </span>
-          </div>
-
-          {/* 5. Custo Global Teto */}
-          <div className="p-3 space-y-0.5 col-span-2 md:col-span-1 bg-amber-500/5">
-            <span className="text-[10px] font-mono text-amber-400 font-bold uppercase tracking-wider block">
-              5. Teto Global
-            </span>
-            <div className="text-base sm:text-xl font-black text-amber-300 font-mono tabular-nums">
-              {formatCurrencyBR(globalProjectBudget)}
-            </div>
-            <span className="text-[10px] text-amber-400/70 font-mono block">
-              {formatCurrencyBR(costPerM2)}/m²
-            </span>
-          </div>
-        </div>
-
-        {/* Faixa Técnica de Status das Aquisições */}
-        <div className="pt-2 border-t border-slate-800/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-[11px] font-mono font-semibold text-slate-300">
-              Evolução das Compras:
-            </span>
-            <span className="text-[11px] font-mono px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-300 font-bold">
-              {compradosCount} de {items.length} itens ({percentComprado.toFixed(0)}%)
-            </span>
-            <span className="text-[11px] font-mono text-slate-400">
-              Comprado: <strong className="text-emerald-400">{formatCurrencyBR(totalComprado)}</strong> • Pendente: <strong className="text-amber-400">{formatCurrencyBR(totalPendente)}</strong>
-            </span>
-          </div>
-
-          {/* Mini Barra de Progresso e Ação */}
-          <div className="flex items-center gap-3">
-            <div className="w-24 sm:w-32 bg-slate-950 rounded-full h-2 overflow-hidden border border-slate-800">
-              <div
-                className="bg-emerald-400 h-full rounded-full transition-all"
-                style={{ width: `${Math.min(percentComprado, 100)}%` }}
-              />
-            </div>
-            {totalPendente > 0 && (
-              <button
-                onClick={() => handleExportCotacaoCSV(true)}
-                className="text-[11px] font-mono font-bold text-amber-400 hover:underline flex items-center gap-1"
-                title="Exportar apenas itens pendentes"
-              >
-                <Download className="w-3 h-3" />
-                Baixar Pendentes
-              </button>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
-      {/* Detailing Control Bar: Search, Filters & View Toggle */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-3 sm:p-4 space-y-3">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
-          {/* Search Input */}
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+      {/* 2. Barra de Filtros & Controle de Visualização da Grade (38px Compacta) */}
+      <div className="h-10 bg-[#080c14] border-b border-slate-800/80 px-4 flex items-center justify-between gap-3 flex-shrink-0 text-xs">
+        {/* Esquerda: Busca rápida e filtros */}
+        <div className="flex items-center gap-2 flex-1 max-w-2xl min-w-0">
+          <div className="relative w-48 sm:w-64">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Pesquisar por item, fabricante, categoria ou ambiente..."
+              placeholder="Buscar insumo, fabricante ou código..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-slate-950 border border-slate-700/80 rounded-xl pl-9 pr-3 py-2 text-xs sm:text-sm text-white placeholder-slate-500 outline-none focus:border-amber-400"
+              className="w-full bg-[#0d121e] border border-slate-800 rounded-lg pl-8 pr-2.5 py-1 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500"
             />
           </div>
 
-          {/* Filters & View Switches */}
-          <div className="flex items-center gap-2 flex-wrap">
-            {/* Filter by Group */}
-            <select
-              value={selectedGroupFilter}
-              onChange={(e) => setSelectedGroupFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-400"
+          {/* Toggle de Agrupamento WBS: Por Etapa vs Por Ambiente */}
+          <div className="flex items-center bg-[#0d121e] border border-slate-800 rounded-lg p-0.5">
+            <button
+              onClick={() => setGroupingMode('etapas')}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
+                groupingMode === 'etapas'
+                  ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <option value="todos">Todos os Grupos</option>
-              {allGroups.map((g) => (
-                <option key={g} value={g}>
-                  Grupo: {g}
-                </option>
-              ))}
-            </select>
-
-            {/* Filter by Room */}
-            <select
-              value={selectedAmbienteFilter}
-              onChange={(e) => setSelectedAmbienteFilter(e.target.value)}
-              className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-400"
+              Por Macro-Etapas
+            </button>
+            <button
+              onClick={() => setGroupingMode('ambientes')}
+              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
+                groupingMode === 'ambientes'
+                  ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
             >
-              <option value="todos">Todos os Ambientes</option>
-              {project.ambientes.map((amb) => (
-                <option key={amb.id} value={amb.id}>
-                  {amb.nome}
-                </option>
-              ))}
-            </select>
-
-            {/* Filter by Status */}
-            <select
-              value={selectedStatusFilter}
-              onChange={(e) => setSelectedStatusFilter(e.target.value as any)}
-              className="bg-slate-950 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none focus:border-amber-400"
-            >
-              <option value="todos">Status: Todos</option>
-              <option value="planejado">Apenas Planejados / A Comprar</option>
-              <option value="comprado">Apenas Já Comprados</option>
-            </select>
-
-            {/* View Mode Toggle: Ambientes (Principal) vs Grupos (Secundário) */}
-            <div className="flex items-center bg-slate-950 border border-slate-700/80 rounded-lg p-0.5">
-              <button
-                onClick={() => setViewMode('ambientes')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                  viewMode === 'ambientes'
-                    ? 'bg-amber-400 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Por Ambiente (Principal)
-              </button>
-              <button
-                onClick={() => setViewMode('grupos')}
-                className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                  viewMode === 'grupos'
-                    ? 'bg-amber-400 text-slate-950 shadow-sm'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Por Grupo (Secundário)
-              </button>
-            </div>
+              Por Ambientes
+            </button>
           </div>
+
+          {/* Filtro Status */}
+          <select
+            value={selectedStatusFilter}
+            onChange={(e) => setSelectedStatusFilter(e.target.value as any)}
+            className="bg-[#0d121e] border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300 outline-none cursor-pointer"
+          >
+            <option value="todos">Status: Todos</option>
+            <option value="planejado">Apenas Planejados</option>
+            <option value="comprado">Apenas Comprados</option>
+          </select>
         </div>
 
-        {/* Counter and Expand/Collapse Bar */}
-        <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400">
-          <div>
-            Exibindo <strong className="text-white">{filteredItems.length}</strong> de{' '}
-            <strong className="text-white">{items.length}</strong> itens
-            {filteredItems.length > 0 && (
-              <span className="ml-2 text-emerald-400 font-semibold font-mono">
-                (Subtotal filtrado: {formatNumberBR(filteredItems.reduce((acc, i) => acc + i.precoTotal, 0))})
-              </span>
-            )}
-          </div>
+        {/* Direita: Totalizadores de itens, Exportar CSV e Expandir/Recolher */}
+        <div className="flex items-center gap-3 text-slate-400 text-[11px] flex-shrink-0">
+          <span className="hidden sm:inline">
+            <strong className="text-white font-mono">{filteredItems.length}</strong> itens exibidos
+          </span>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 font-medium">
             <button
               onClick={handleExpandAll}
-              className="text-xs text-slate-400 hover:text-amber-400 transition-colors"
+              className="hover:text-sky-400 transition-colors"
             >
-              Expandir Todos
+              Expandir
             </button>
             <span>•</span>
             <button
               onClick={handleCollapseAll}
-              className="text-xs text-slate-400 hover:text-amber-400 transition-colors"
+              className="hover:text-sky-400 transition-colors"
             >
-              Recolher Todos
+              Recolher
             </button>
           </div>
+
+          <button
+            type="button"
+            onClick={handleExportCSV}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-emerald-400 border border-slate-800 transition-colors font-semibold"
+            title="Exportar Planilha Orçamentária WBS em CSV"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden sm:inline">Exportar CSV</span>
+          </button>
         </div>
       </div>
 
-      {/* MAIN VIEW: BY GROUPS & CATEGORIES (COMPACT TABLE FORMAT) */}
-      {viewMode === 'grupos' && (
-        <div className="space-y-4">
-          {groupedData.length === 0 ? (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center text-slate-400 space-y-3">
-              <Layers className="w-8 h-8 text-slate-600 mx-auto" />
-              <p className="text-sm font-semibold">Nenhum item encontrado para os filtros selecionados.</p>
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setSelectedGroupFilter('todos');
-                  setSelectedAmbienteFilter('todos');
-                  setSelectedStatusFilter('todos');
-                }}
-                className="text-xs text-amber-400 hover:underline font-bold"
-              >
-                Limpar todos os filtros
-              </button>
-            </div>
-          ) : (
-            groupedData.map((group) => {
-              // Grupos iniciam recolhidos por padrão na vista secundária
-              const isExpanded = !!expandedGroups[group.grupoNome];
-              const groupPercent = rawTotalActive > 0 ? (group.subtotal / rawTotalActive) * 100 : 0;
+      {/* 3. Área Central: Grade WBS Hierárquica em Árvore (Full Width) + Painel Inspetor Lateral */}
+      <div className="flex-1 flex min-h-0 relative overflow-hidden pb-14">
+        {/* TABELA WBS 100% LARGURA */}
+        <div className="flex-1 overflow-y-auto overflow-x-auto">
+          <table className="w-full text-left border-collapse min-w-[1050px]">
+            {/* Header Corporativo (Inspirado no Sienge / Mais Controle) */}
+            <thead className="bg-[#0b101c] text-slate-300 border-b border-slate-800 text-[11px] font-mono uppercase tracking-wider sticky top-0 z-10 select-none shadow-sm">
+              <tr>
+                <th className="py-2.5 px-3 w-16 text-center">Item</th>
+                <th className="py-2.5 px-3">Descrição do Insumo / Composição</th>
+                <th className="py-2.5 px-3 w-32">Ambiente</th>
+                <th className="py-2.5 px-3 w-20 text-right">Qtde</th>
+                <th className="py-2.5 px-3 w-14 text-center">Un.</th>
+                <th className="py-2.5 px-3 w-28 text-right">Custo Unit.</th>
+                <th className="py-2.5 px-3 w-32 text-right">Custo Total</th>
+                <th className="py-2.5 px-3 w-20 text-center">BDI</th>
+                <th className="py-2.5 px-3 w-28 text-right">Preço Unit.</th>
+                <th className="py-2.5 px-3 w-32 text-right">Preço Total</th>
+                <th className="py-2.5 px-3 w-24 text-center">Status</th>
+                <th className="py-2.5 px-3 w-20 text-center">Ações</th>
+              </tr>
+            </thead>
 
-              return (
-                <div
-                  key={group.grupoNome}
-                  className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm transition-all"
-                >
-                  {/* Grupo Header */}
-                  <div className="p-3.5 sm:p-4 bg-slate-900 flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800">
-                    <button
-                      onClick={() => toggleGroup(group.grupoNome)}
-                      className="flex items-center gap-2.5 text-left group flex-1"
-                    >
-                      <div className="text-slate-400 group-hover:text-amber-400 transition-colors">
-                        {isExpanded ? (
-                          <ChevronDown className="w-5 h-5" />
-                        ) : (
-                          <ChevronRight className="w-5 h-5" />
-                        )}
-                      </div>
+            {/* Linhas da WBS */}
+            <tbody className="divide-y divide-slate-800/60 text-xs">
+              {activeSections.length === 0 ? (
+                <tr>
+                  <td colSpan={12} className="py-16 text-center text-slate-500">
+                    <p className="font-semibold">Nenhum item encontrado com os filtros atuais.</p>
+                  </td>
+                </tr>
+              ) : (
+                activeSections.map((section, sIdx) => {
+                  const isExpanded = Boolean(expandedSections[section.id]); // Padrão: recolhido (conforme solicitado pelo usuário)
+                  const macroCode = `${sIdx + 1}.0`;
+                  const macroBdi = contingencyPercent;
+                  const macroCustoTotal = section.subtotal;
+                  const macroPrecoTotal = macroCustoTotal * (1 + macroBdi / 100);
 
-                      <div className="p-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60">
-                        {getGroupIcon(group.grupoNome)}
-                      </div>
-
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="text-sm sm:text-base font-extrabold text-white group-hover:text-amber-400 transition-colors">
-                            {group.grupoNome}
-                          </h3>
-                          <span className="text-[11px] px-2 py-0.2 rounded-full bg-slate-800 text-slate-300 font-semibold">
-                            {group.totalItens} {group.totalItens === 1 ? 'item' : 'itens'}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 block mt-0.5">
-                          Representa {groupPercent.toFixed(1)}% do total de materiais
-                        </span>
-                      </div>
-                    </button>
-
-                    <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-800">
-                      <div className="text-right">
-                        <span className="text-[11px] text-slate-400 block">Subtotal do Grupo:</span>
-                        <strong className="text-base sm:text-lg font-black text-amber-400 font-mono tabular-nums">
-                          {formatNumberBR(group.subtotal)}
-                        </strong>
-                      </div>
-
-                      <button
-                        onClick={() => handleOpenAddItem(group.grupoNome)}
-                        className="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 hover:text-white font-bold text-xs rounded-xl flex items-center gap-1 transition-all shadow"
-                        title={`Adicionar novo item no grupo ${group.grupoNome}`}
-                      >
-                        <Plus className="w-3.5 h-3.5 text-amber-400" />
-                        <span>+ Item</span>
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Grupo Content: Compact Tables per Category */}
-                  {isExpanded && (
-                    <div className="p-2 sm:p-4 bg-slate-950/40 space-y-3">
-                      {Object.values(group.categorias).map((cat) => (
-                        <div
-                          key={cat.categoriaNome}
-                          className="border border-slate-800/90 rounded-xl overflow-hidden bg-slate-900/80 shadow-sm"
-                        >
-                          {/* Categoria Subheader */}
-                          <div className="px-3.5 py-2 bg-slate-800/50 border-b border-slate-800/80 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>
-                              <h4 className="text-xs font-bold text-slate-200 uppercase tracking-wider">
-                                {cat.categoriaNome}
-                              </h4>
-                              <span className="text-[10px] text-slate-400">
-                                ({cat.itens.length} {cat.itens.length === 1 ? 'item' : 'itens'})
-                              </span>
-                            </div>
-                            <span className="text-xs font-extrabold text-emerald-400 font-mono tabular-nums">
-                              {formatNumberBR(cat.subtotal)}
+                  return (
+                    <React.Fragment key={section.id}>
+                      {/* LINHA DE MACRO-ETAPA / NÍVEL 1 (SINTÉTICA) */}
+                      <tr className="bg-[#0e1424] hover:bg-[#121a2f] border-t-2 border-b border-slate-700/80 transition-colors font-bold text-white">
+                        <td className="py-2.5 px-3 text-center font-mono text-sky-400 font-extrabold">
+                          {macroCode}
+                        </td>
+                        <td className="py-2.5 px-3" colSpan={2}>
+                          <button
+                            onClick={() => toggleSection(section.id)}
+                            className="flex items-center gap-2.5 text-left w-full group focus:outline-none"
+                          >
+                            <span className="p-0.5 rounded text-slate-400 group-hover:text-amber-400 transition-colors">
+                              {isExpanded ? (
+                                <ChevronDown className="w-4 h-4" />
+                              ) : (
+                                <ChevronRight className="w-4 h-4" />
+                              )}
                             </span>
-                          </div>
-
-                          {/* Dense Table View for Quantitativos */}
-                          <div className="overflow-x-auto">
-                            <table className="w-full text-left border-collapse text-xs">
-                              <thead>
-                                <tr className="bg-slate-950/70 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400 select-none">
-                                  <th className="py-2 px-3 font-extrabold w-28">Status</th>
-                                  <th className="py-2 px-3 font-extrabold min-w-[200px]">Item / Especificação</th>
-                                  <th className="py-2 px-2.5 font-extrabold">Ambiente</th>
-                                  <th className="py-2 px-2.5 font-extrabold text-right">Qtd Base</th>
-                                  <th className="py-2 px-2 font-extrabold text-center">Perda</th>
-                                  <th className="py-2 px-2.5 font-extrabold text-right text-amber-300">Qtd Compra</th>
-                                  <th className="py-2 px-2 font-extrabold">Unid</th>
-                                  <th className="py-2 px-3 font-extrabold text-right">Preço Unit</th>
-                                  <th className="py-2 px-3 font-extrabold text-right text-white">Subtotal</th>
-                                  <th className="py-2 px-3 font-extrabold hidden lg:table-cell">Loja / Cotação</th>
-                                  <th className="py-2 px-2.5 font-extrabold text-center w-20">Ações</th>
-                                </tr>
-                              </thead>
-                              <tbody className="divide-y divide-slate-800/50">
-                                {cat.itens.map((item) => {
-                                  const room = project.ambientes.find((a) => a.id === item.ambienteId);
-
-                                  return (
-                                    <tr
-                                      key={item.id}
-                                      className="hover:bg-slate-800/40 transition-colors group"
-                                    >
-                                      {/* Status Interactive Toggle */}
-                                      <td className="py-2 px-3 whitespace-nowrap">
-                                        <button
-                                          onClick={() => handleToggleItemComprado(item.id, !!item.comprado)}
-                                          className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
-                                            item.comprado
-                                              ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                                              : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-amber-400/50 hover:text-amber-300'
-                                          }`}
-                                          title="Clique para alternar entre Planejado e Comprado"
-                                        >
-                                          {item.comprado ? (
-                                            <>
-                                              <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                              <span>Comprado</span>
-                                            </>
-                                          ) : (
-                                            <>
-                                              <Clock className="w-3 h-3 text-slate-400" />
-                                              <span>Planejado</span>
-                                            </>
-                                          )}
-                                        </button>
-                                      </td>
-
-                                      {/* Item Description, Brand & Specs */}
-                                      <td className="py-2 px-3">
-                                        <div className="font-bold text-white text-xs leading-snug">
-                                          {item.materialNome}
-                                        </div>
-                                        <div className="text-[10px] text-slate-400 flex items-center gap-1.5 flex-wrap mt-0.5">
-                                          <span className="text-amber-400 font-semibold">{item.fabricante || 'Genérico'}</span>
-                                          {item.tipo && <span>• {item.tipo}</span>}
-                                          {item.observacoes && (
-                                            <span className="italic text-slate-400">• {item.observacoes}</span>
-                                          )}
-                                        </div>
-                                      </td>
-
-                                      {/* Room Badge */}
-                                      <td className="py-2 px-2.5 whitespace-nowrap">
-                                        <span className="text-[10px] font-semibold px-2 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700/60">
-                                          {room?.nome ? (room.nome.includes('Pastoral') ? 'Casa Pastoral' : room.nome.includes('Masculino') ? 'Banheiro Masc.' : room.nome) : 'Geral'}
-                                        </span>
-                                      </td>
-
-                                      {/* Qtd Base */}
-                                      <td className="py-2 px-2.5 text-right font-medium text-slate-300 whitespace-nowrap font-mono text-[11px]">
-                                        {item.quantidadeBase}
-                                      </td>
-
-                                      {/* Technical Loss Margin % */}
-                                      <td className="py-2 px-2 text-center text-[10px] text-amber-400 whitespace-nowrap font-bold">
-                                        {item.perdaTecnicaPercent > 0 ? `+${item.perdaTecnicaPercent}%` : '—'}
-                                      </td>
-
-                                      {/* Qtd Compra / Final */}
-                                      <td className="py-2 px-2.5 text-right font-black text-amber-300 whitespace-nowrap font-mono text-[11px]">
-                                        {item.quantidadeComPerda}
-                                      </td>
-
-                                      {/* Unit */}
-                                      <td className="py-2 px-2 text-[10px] text-slate-400 whitespace-nowrap font-medium">
-                                        {item.unidade}
-                                      </td>
-
-                                      {/* Unit Price */}
-                                      <td className="py-2 px-3 text-right text-slate-300 whitespace-nowrap font-mono text-[11px] tabular-nums">
-                                        {formatNumberBR(item.precoUnitario)}
-                                      </td>
-
-                                      {/* Subtotal */}
-                                      <td className="py-2 px-3 text-right font-black text-white whitespace-nowrap font-mono text-xs tabular-nums">
-                                        {formatNumberBR(item.precoTotal)}
-                                      </td>
-
-                                      {/* Reference Store / Quotation */}
-                                      <td
-                                        className="py-2 px-3 text-[10px] text-slate-400 truncate max-w-[130px] hidden lg:table-cell"
-                                        title={item.lojaReferencia || 'Não informado'}
-                                      >
-                                        {item.lojaReferencia || '—'}
-                                      </td>
-
-                                      {/* Action Buttons: Alterar & Excluir */}
-                                      <td className="py-2 px-2.5 text-center whitespace-nowrap">
-                                        <div className="flex items-center justify-center gap-1">
-                                          <button
-                                            onClick={() => handleOpenEditItem(item)}
-                                            className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-md transition-all active:scale-95"
-                                            title="Alterar este item"
-                                          >
-                                            <Edit2 className="w-3.5 h-3.5" />
-                                          </button>
-                                          <button
-                                            onClick={() => handleDeleteItem(item.id, item.materialNome)}
-                                            className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-md transition-all active:scale-95"
-                                            title="Excluir este item do orçamento"
-                                          >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                          </button>
-                                        </div>
-                                      </td>
-                                    </tr>
+                            <span className="font-black tracking-tight text-white group-hover:text-sky-300 transition-colors uppercase text-xs sm:text-[13px]">
+                              {section.nome}
+                            </span>
+                            <span className="text-[10px] font-mono px-2 py-0.2 rounded-full bg-slate-800 text-slate-300 font-normal">
+                              {section.itens.length} {section.itens.length === 1 ? 'item' : 'itens'}
+                            </span>
+                          </button>
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-400 text-[11px]">—</td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400 text-[11px]">—</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-400 text-[11px]">—</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-100 font-bold tabular-nums">
+                          R$ {formatNumberBR(macroCustoTotal)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-sky-400 tabular-nums">
+                          {macroBdi.toFixed(1)}%
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono text-slate-400 text-[11px]">—</td>
+                        <td className="py-2.5 px-3 text-right font-mono text-sky-400 font-black tabular-nums">
+                          R$ {formatNumberBR(macroPrecoTotal)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center text-slate-400 text-[11px]">—</td>
+                        <td className="py-2.5 px-3 text-center">
+                          {editModeEnabled && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (groupingMode === 'etapas') {
+                                  handleOpenAddItem(
+                                    section.nome,
+                                    undefined,
+                                    selectedAmbienteFilter !== 'todos' ? selectedAmbienteFilter : undefined
                                   );
-                                })}
-                              </tbody>
-                            </table>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })
-          )}
-        </div>
-      )}
+                                } else {
+                                  handleOpenAddItem(
+                                    selectedGroupFilter !== 'todos' ? selectedGroupFilter : undefined,
+                                    undefined,
+                                    section.id
+                                  );
+                                }
+                              }}
+                              className="flex items-center gap-1 px-2 py-1 rounded bg-slate-800 hover:bg-amber-400 hover:text-slate-950 text-slate-300 transition-colors text-[11px] font-semibold"
+                              title={`Adicionar item em ${section.nome}`}
+                            >
+                              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span className="hidden sm:inline">Adicionar</span>
+                            </button>
+                          )}
+                        </td>
+                      </tr>
 
-      {/* ALTERNATIVE VIEW: BY ENVIRONMENTS (ROOMS) - COMPACT TABLE */}
-      {viewMode === 'ambientes' && (
-        <div className="space-y-4">
-          {project.ambientes.map((ambiente) => {
-            const isExpanded = expandedRooms[ambiente.id] !== false;
-            const roomItems = filteredItems.filter((i) => i.ambienteId === ambiente.id);
-            const roomTotal = roomItems.reduce((acc, i) => acc + i.precoTotal, 0);
+                      {/* SUB-ITENS / NÍVEL 2 (ANALÍTICA) */}
+                      {isExpanded &&
+                        section.itens.map((item, itemIdx) => {
+                          const itemCode = `${sIdx + 1}.${itemIdx + 1}`;
+                          const isSelected = selectedInspectorItem?.id === item.id;
+                          const roomName =
+                            project.ambientes.find((a) => a.id === item.ambienteId)?.nome || 'Geral';
+                          const precoUnitVenda = item.precoUnitario * (1 + contingencyPercent / 100);
+                          const precoTotVenda = item.precoTotal * (1 + contingencyPercent / 100);
 
-            return (
-              <div
-                key={ambiente.id}
-                className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden shadow-sm"
-              >
-                {/* Room Header row */}
-                <div className="p-3.5 bg-slate-900 flex items-center justify-between border-b border-slate-800">
-                  <button
-                    onClick={() => toggleRoom(ambiente.id)}
-                    className="flex items-center gap-2.5 text-left group flex-1"
-                  >
-                    <div className="text-slate-400 group-hover:text-amber-400 transition-colors">
-                      {isExpanded ? (
-                        <ChevronDown className="w-5 h-5" />
-                      ) : (
-                        <ChevronRight className="w-5 h-5" />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <h3 className="text-sm sm:text-base font-bold text-white group-hover:text-amber-400 transition-colors">
-                          {ambiente.nome}
-                        </h3>
-                        {ambiente.areaPisoM2 > 0 && (
-                          <span className="text-[10px] px-2 py-0.2 rounded bg-slate-800 text-slate-300 font-medium">
-                            {ambiente.areaPisoM2} m² piso
-                          </span>
-                        )}
-                        <span className="text-[10px] text-slate-400">
-                          ({roomItems.length} {roomItems.length === 1 ? 'item' : 'itens'})
-                        </span>
-                      </div>
-                      {ambiente.observacoes && (
-                        <p className="text-[11px] text-slate-400 mt-0.5 line-clamp-1">{ambiente.observacoes}</p>
-                      )}
-                    </div>
-                  </button>
+                          return (
+                            <tr
+                              key={item.id}
+                              onClick={() => {
+                                setSelectedInspectorItem(item);
+                                setSelectedItemCode(itemCode);
+                              }}
+                              className={`cursor-pointer transition-colors group ${
+                                isSelected
+                                  ? 'bg-sky-500/15 border-y border-sky-500/40 text-white'
+                                  : 'hover:bg-slate-800/40 text-slate-300'
+                              }`}
+                            >
+                              {/* Código do Item */}
+                              <td className="py-2 px-3 text-center font-mono text-slate-400 font-semibold group-hover:text-white">
+                                {itemCode}
+                              </td>
 
-                  <div className="flex items-center gap-3">
-                    <div className="text-right">
-                      <span className="text-[11px] text-slate-400 block sm:inline mr-1">Subtotal:</span>
-                      <strong className="text-sm sm:text-base font-extrabold text-emerald-400 font-mono tabular-nums">
-                        {formatNumberBR(roomTotal)}
-                      </strong>
-                    </div>
+                              {/* Descrição do Insumo / Fabricante */}
+                              <td className="py-2 px-3">
+                                <div className="flex flex-col min-w-0">
+                                  <span className="font-semibold text-slate-100 group-hover:text-sky-300 transition-colors">
+                                    {item.materialNome}
+                                  </span>
+                                  <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 font-mono">
+                                    {item.fabricante && (
+                                      <span className="text-amber-400/90 font-medium">
+                                        Fab: {item.fabricante}
+                                      </span>
+                                    )}
+                                    {item.lojaReferencia && (
+                                      <span>• Ref: {item.lojaReferencia}</span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
 
-                    <button
-                      onClick={() => handleOpenAddItem()}
-                      className="p-1 sm:px-2.5 sm:py-1.5 bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs rounded-xl flex items-center gap-1 shadow transition-transform active:scale-95"
-                      title="Adicionar material a este ambiente"
-                    >
-                      <Plus className="w-3.5 h-3.5" />
-                      <span className="hidden sm:inline">+ Item</span>
-                    </button>
-                  </div>
-                </div>
+                              {/* Ambiente */}
+                              <td className="py-2 px-3">
+                                <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800 text-slate-300 truncate max-w-[120px]">
+                                  {roomName}
+                                </span>
+                              </td>
 
-                {/* Room Items in Table */}
-                {isExpanded && (
-                  <div className="p-2 sm:p-4 bg-slate-950/40">
-                    {roomItems.length === 0 ? (
-                      <div className="py-6 text-center text-slate-500 text-xs space-y-1">
-                        <p>Nenhum item adicionado a este ambiente com os filtros atuais.</p>
-                      </div>
-                    ) : (
-                      <div className="border border-slate-800 rounded-xl overflow-hidden bg-slate-900/80">
-                        <div className="overflow-x-auto">
-                          <table className="w-full text-left border-collapse text-xs">
-                            <thead>
-                              <tr className="bg-slate-950/70 border-b border-slate-800 text-[10px] uppercase tracking-wider text-slate-400">
-                                <th className="py-2 px-3 font-extrabold w-28">Status</th>
-                                <th className="py-2 px-3 font-extrabold">Material / Especificação</th>
-                                <th className="py-2 px-2.5 font-extrabold">Grupo / Classe</th>
-                                <th className="py-2 px-2.5 font-extrabold text-right">Qtd Base</th>
-                                <th className="py-2 px-2 font-extrabold text-center">Perda</th>
-                                <th className="py-2 px-2.5 font-extrabold text-right text-amber-300">Qtd Compra</th>
-                                <th className="py-2 px-2 font-extrabold">Unid</th>
-                                <th className="py-2 px-3 font-extrabold text-right">Preço Unit</th>
-                                <th className="py-2 px-3 font-extrabold text-right text-white">Subtotal</th>
-                                <th className="py-2 px-2.5 font-extrabold text-center w-20">Ações</th>
-                              </tr>
-                            </thead>
-                            <tbody className="divide-y divide-slate-800/50">
-                              {roomItems.map((item) => (
-                                <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
-                                  {/* Status */}
-                                  <td className="py-2 px-3 whitespace-nowrap">
-                                    <button
-                                      onClick={() => handleToggleItemComprado(item.id, !!item.comprado)}
-                                      className={`flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all ${
-                                        item.comprado
-                                          ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-500/30'
-                                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:border-amber-400/50 hover:text-amber-300'
-                                      }`}
-                                    >
-                                      {item.comprado ? (
-                                        <>
-                                          <CheckCircle2 className="w-3 h-3 text-emerald-400" />
-                                          <span>Comprado</span>
-                                        </>
-                                      ) : (
-                                        <>
-                                          <Clock className="w-3 h-3 text-slate-400" />
-                                          <span>Planejado</span>
-                                        </>
-                                      )}
-                                    </button>
-                                  </td>
+                              {/* Qtde */}
+                              <td className="py-2 px-3 text-right font-mono tabular-nums text-slate-200">
+                                {formatNumberBR(item.quantidadeComPerda)}
+                              </td>
 
-                                  {/* Item */}
-                                  <td className="py-2 px-3">
-                                    <div className="font-bold text-white text-xs">{item.materialNome}</div>
-                                    <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
-                                      <span className="text-amber-400 font-semibold">{item.fabricante || 'Genérico'}</span>
-                                      {item.categoria && <span>• {item.categoria}</span>}
-                                    </div>
-                                  </td>
+                              {/* Unidade */}
+                              <td className="py-2 px-3 text-center font-mono text-slate-400 text-[11px]">
+                                {item.unidade}
+                              </td>
 
-                                  {/* Classe */}
-                                  <td className="py-2 px-2.5 whitespace-nowrap text-[10px] font-semibold text-slate-300">
-                                    {item.classe}
-                                  </td>
+                              {/* Custo Unitário */}
+                              <td className="py-2 px-3 text-right font-mono tabular-nums text-slate-300">
+                                {formatNumberBR(item.precoUnitario)}
+                              </td>
 
-                                  {/* Qtd Base */}
-                                  <td className="py-2 px-2.5 text-right font-medium text-slate-300 whitespace-nowrap font-mono text-[11px]">
-                                    {item.quantidadeBase}
-                                  </td>
+                              {/* Custo Total */}
+                              <td className="py-2 px-3 text-right font-mono tabular-nums font-semibold text-slate-100">
+                                {formatNumberBR(item.precoTotal)}
+                              </td>
 
-                                  {/* Perda */}
-                                  <td className="py-2 px-2 text-center text-[10px] text-amber-400 whitespace-nowrap font-bold">
-                                    {item.perdaTecnicaPercent > 0 ? `+${item.perdaTecnicaPercent}%` : '—'}
-                                  </td>
+                              {/* BDI % */}
+                              <td className="py-2 px-3 text-center font-mono text-slate-400 tabular-nums">
+                                {contingencyPercent.toFixed(1)}%
+                              </td>
 
-                                  {/* Qtd Compra */}
-                                  <td className="py-2 px-2.5 text-right font-black text-amber-300 whitespace-nowrap font-mono text-[11px]">
-                                    {item.quantidadeComPerda}
-                                  </td>
+                              {/* Preço Unitário Venda */}
+                              <td className="py-2 px-3 text-right font-mono tabular-nums text-slate-400">
+                                {formatNumberBR(precoUnitVenda)}
+                              </td>
 
-                                  {/* Unidade */}
-                                  <td className="py-2 px-2 text-[10px] text-slate-400 whitespace-nowrap font-medium">
-                                    {item.unidade}
-                                  </td>
+                              {/* Preço Total Venda */}
+                              <td className="py-2 px-3 text-right font-mono tabular-nums font-bold text-sky-400">
+                                {formatNumberBR(precoTotVenda)}
+                              </td>
 
-                                  {/* Preço Unit */}
-                                  <td className="py-2 px-3 text-right text-slate-300 whitespace-nowrap font-mono text-[11px] tabular-nums">
-                                    {formatNumberBR(item.precoUnitario)}
-                                  </td>
+                              {/* Status Compra Pill */}
+                              <td className="py-2 px-3 text-center">
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleToggleItemComprado(item.id, !!item.comprado);
+                                  }}
+                                  className={`px-2 py-0.5 rounded-full text-[10px] font-bold transition-transform active:scale-95 ${
+                                    item.comprado
+                                      ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
+                                      : 'bg-slate-800 text-slate-400 hover:text-white border border-slate-700'
+                                  }`}
+                                  title="Clique para alternar status de compra"
+                                >
+                                  {item.comprado ? 'Comprado' : 'Planejado'}
+                                </button>
+                              </td>
 
-                                  {/* Subtotal */}
-                                  <td className="py-2 px-3 text-right font-black text-white whitespace-nowrap font-mono text-xs tabular-nums">
-                                    {formatNumberBR(item.precoTotal)}
-                                  </td>
-
-                                  {/* Ações */}
-                                  <td className="py-2 px-2.5 text-center whitespace-nowrap">
-                                    <div className="flex items-center justify-center gap-1">
+                              {/* Ações */}
+                              <td className="py-2 px-3 text-center">
+                                <div className="flex items-center justify-center gap-1 opacity-60 group-hover:opacity-100 transition-opacity">
+                                  {editModeEnabled && (
+                                    <>
                                       <button
-                                        onClick={() => handleOpenEditItem(item)}
-                                        className="p-1.5 text-slate-400 hover:text-amber-300 hover:bg-slate-800 rounded-md transition-all active:scale-95"
-                                        title="Alterar este item"
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenEditItem(item);
+                                        }}
+                                        className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800"
+                                        title="Editar item"
                                       >
                                         <Edit2 className="w-3.5 h-3.5" />
                                       </button>
                                       <button
-                                        onClick={() => handleDeleteItem(item.id, item.materialNome)}
-                                        className="p-1.5 text-slate-500 hover:text-rose-400 hover:bg-rose-950/40 rounded-md transition-all active:scale-95"
-                                        title="Excluir este item"
+                                        type="button"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleDeleteItem(item.id);
+                                        }}
+                                        className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800"
+                                        title="Excluir item"
                                       >
                                         <Trash2 className="w-3.5 h-3.5" />
                                       </button>
-                                    </div>
-                                  </td>
-                                </tr>
-                              ))}
-                            </tbody>
-                          </table>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
+                                    </>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
 
-      {/* Unified Project Item Modal (Inclusão e Alteração) */}
+                      {/* Linha inline de inclusão rápida ao final da etapa expandida */}
+                      {editModeEnabled && isExpanded && (
+                        <tr className="bg-[#090e1c]/70 border-b border-slate-800/80">
+                          <td colSpan={12} className="py-2 px-4">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                if (groupingMode === 'etapas') {
+                                  handleOpenAddItem(
+                                    section.nome,
+                                    undefined,
+                                    selectedAmbienteFilter !== 'todos' ? selectedAmbienteFilter : undefined
+                                  );
+                                } else {
+                                  handleOpenAddItem(
+                                    selectedGroupFilter !== 'todos' ? selectedGroupFilter : undefined,
+                                    undefined,
+                                    section.id
+                                  );
+                                }
+                              }}
+                              className="flex items-center gap-1.5 text-xs font-bold text-sky-400 hover:text-sky-300 py-1.5 px-3 rounded-lg hover:bg-sky-500/10 transition-colors border border-dashed border-sky-500/30 hover:border-sky-500/60"
+                            >
+                              <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                              <span>+ Incluir insumo em {section.nome}</span>
+                            </button>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* PAINEL INSPETOR LATERAL (Slide-over da Opção 2) */}
+        {selectedInspectorItem && (
+          <WbsItemInspector
+            item={selectedInspectorItem}
+            itemCode={selectedItemCode}
+            ambienteNome={
+              project.ambientes.find((a) => a.id === selectedInspectorItem.ambienteId)?.nome || 'Geral'
+            }
+            bdiPercent={contingencyPercent}
+            onClose={() => setSelectedInspectorItem(null)}
+            onToggleComprado={handleToggleItemComprado}
+            onEditItem={(it) => {
+              handleOpenEditItem(it);
+            }}
+            onAddItemInStage={(classe, categoria, ambienteId) => {
+              handleOpenAddItem(classe, categoria, ambienteId);
+            }}
+          />
+        )}
+      </div>
+
+      {/* 4. STICKY FOOTER SUMMARY DOCK (Barra de Rodapé Executiva da Opção 1) */}
+      <footer className="h-14 bg-[#090d16]/95 backdrop-blur-md border-t border-slate-800 px-4 flex items-center justify-between absolute bottom-0 left-0 right-0 z-30 select-none shadow-2xl">
+        {/* Esquerda: Ações Rápidas de Inclusão */}
+        <div className="flex items-center gap-2">
+          {editModeEnabled && (
+            <>
+              <button
+                onClick={() =>
+                  handleOpenAddItem(
+                    selectedGroupFilter !== 'todos' ? selectedGroupFilter : undefined,
+                    undefined,
+                    selectedAmbienteFilter !== 'todos' ? selectedAmbienteFilter : undefined
+                  )
+                }
+                className="flex items-center gap-2 px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs transition-all shadow-md active:scale-95"
+              >
+                <Plus className="w-4 h-4 stroke-[3]" />
+                <span>+ Inserir Etapa / Item</span>
+              </button>
+
+              <button
+                onClick={onOpenCatalog}
+                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition-colors"
+              >
+                <Layers className="w-3.5 h-3.5 text-amber-400" />
+                <span>Do Catálogo</span>
+              </button>
+            </>
+          )}
+        </div>
+
+        {/* Direita: Resumo Executivo Consolidado */}
+        <div className="flex items-center gap-3 sm:gap-6 text-xs">
+          <div className="text-[11px] font-mono text-slate-400 uppercase tracking-wider hidden lg:block font-bold">
+            Resumo da Obra:
+          </div>
+
+          {/* Custo Total Direto */}
+          <div className="flex items-baseline gap-1.5">
+            <span className="text-[11px] text-slate-400 font-medium">Custo Total:</span>
+            <strong className="text-white font-mono text-sm sm:text-base font-extrabold tabular-nums">
+              {formatCurrencyBR(rawTotalActive)}
+            </strong>
+          </div>
+
+          {/* BDI Global Editável Inline */}
+          <div className="flex items-center gap-1.5 bg-[#0f172a] px-2.5 py-1 rounded-lg border border-slate-800">
+            <span className="text-[11px] text-slate-400">BDI:</span>
+            {isEditingBdi ? (
+              <div className="flex items-center gap-1">
+                <input
+                  type="number"
+                  step="0.5"
+                  value={tempBdi}
+                  onChange={(e) => setTempBdi(e.target.value)}
+                  className="w-14 bg-slate-950 border border-sky-400 rounded px-1 text-xs font-mono text-white text-center outline-none"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSaveBdi}
+                  className="p-1 rounded bg-sky-500 hover:bg-sky-400 text-slate-950 font-bold"
+                  title="Salvar BDI"
+                >
+                  <Check className="w-3 h-3" />
+                </button>
+                <button
+                  onClick={() => setIsEditingBdi(false)}
+                  className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-400"
+                  title="Cancelar"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => {
+                  setTempBdi(String(contingencyPercent));
+                  setIsEditingBdi(true);
+                }}
+                className="flex items-center gap-1 font-mono font-bold text-sky-400 hover:underline"
+                title="Clique para editar taxa de BDI"
+              >
+                <span>{contingencyPercent.toFixed(1)}%</span>
+                <span className="text-[10px]">📝</span>
+              </button>
+            )}
+          </div>
+
+          {/* Preço Global da Proposta */}
+          <div className="flex items-baseline gap-1.5 bg-emerald-950/20 px-3 py-1 rounded-lg border border-emerald-800/40">
+            <span className="text-[11px] text-emerald-400/90 font-medium">Preço Venda:</span>
+            <strong className="text-emerald-400 font-mono text-sm sm:text-base font-black tabular-nums">
+              {formatCurrencyBR(globalProjectBudget)}
+            </strong>
+          </div>
+        </div>
+      </footer>
+
+      {/* Modal de Criação / Edição de Item */}
       <ProjectItemModal
         isOpen={isItemModalOpen}
+        onClose={() => setIsItemModalOpen(false)}
         mode={itemModalMode}
         itemToEdit={itemToEdit}
-        preselectedClasse={preselectedGroupForNewItem}
-        materials={materials}
-        taxonomia={taxonomia}
+        initialData={itemToEdit}
         ambientes={project.ambientes}
-        onClose={() => setIsItemModalOpen(false)}
+        taxonomia={taxonomia}
+        materials={materials}
+        preselectedClasse={preselectedGroupForNewItem}
+        preselectedGroup={preselectedGroupForNewItem}
+        preselectedCategoria={preselectedCategoryForNewItem}
+        preselectedCategory={preselectedCategoryForNewItem}
+        preselectedAmbienteId={preselectedAmbienteForNewItem}
         onSave={handleSaveItem}
       />
     </div>

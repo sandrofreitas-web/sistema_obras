@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Material, Loja, Projeto, TaxonomiaClasse, ItemFilaOffline } from './types';
 import { storageService } from './services/storageService';
+import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Navigation, TabType } from './components/Navigation';
 import { CatalogScreen } from './components/CatalogScreen';
@@ -26,11 +27,11 @@ export default function App() {
   const [offlineQueue, setOfflineQueue] = useState<ItemFilaOffline[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
-  // Active navigation tab
-  const [currentTab, setCurrentTab] = useState<TabType>('catalogo');
+  // Active navigation tab (Orçamento WBS como visão padrão)
+  const [currentTab, setCurrentTab] = useState<TabType>('orcamento');
 
-  // Desktop simulator for mobile view
-  const [isMobileViewMode, setIsMobileViewMode] = useState<boolean>(false);
+  // Modo de Edição habilitado / bloqueado
+  const [editModeEnabled, setEditModeEnabled] = useState<boolean>(true);
 
   // Modal controls
   const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false);
@@ -105,8 +106,6 @@ export default function App() {
   };
 
   const handleOpenAddMaterialToRoom = (ambienteId: string) => {
-    // If user clicks "+ Adicionar Item" inside a room accordion on Budget screen,
-    // open the catalog so they can choose a material and press "+ Orçar"
     setCurrentTab('catalogo');
   };
 
@@ -122,51 +121,38 @@ export default function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col font-sans selection:bg-amber-400 selection:text-slate-950">
-      {/* Top Header */}
-      <Header
-        activeProject={activeProject}
-        projects={projects}
-        onSelectProject={handleSelectProject}
-        onOpenNewProject={() => setIsNewProjectModalOpen(true)}
-        isOnline={isOnline}
-        offlineQueue={offlineQueue}
-        onOpenOfflineQueue={() => setIsOfflineQueueModalOpen(true)}
-        isMobileViewMode={isMobileViewMode}
-        onToggleMobileViewMode={() => setIsMobileViewMode(!isMobileViewMode)}
-        onResetToPilot={handleResetToPilot}
-      />
+    <div className="h-screen w-screen overflow-hidden bg-[#060911] text-slate-100 flex flex-row font-sans selection:bg-amber-400 selection:text-slate-950">
+      {/* 1. Menu Lateral Esquerdo Compacto Sistêmico (Desktop) */}
+      <div className="hidden md:flex h-full">
+        <Sidebar
+          currentTab={currentTab}
+          onSelectTab={setCurrentTab}
+          onOpenCapture={() => setIsCaptureModalOpen(true)}
+          isOnline={isOnline}
+          offlineQueue={offlineQueue}
+          onOpenOfflineQueue={() => setIsOfflineQueueModalOpen(true)}
+          onResetToPilot={handleResetToPilot}
+        />
+      </div>
 
-      {/* Navigation Bars (Top Desktop bar + Bottom Mobile sticky bar) */}
-      <Navigation
-        currentTab={currentTab}
-        onSelectTab={setCurrentTab}
-        onOpenCapture={() => setIsCaptureModalOpen(true)}
-      />
+      {/* 2. Coluna Principal do Workbench de Engenharia (100% Full-Width) */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+        {/* Header Superior de Contexto da Obra */}
+        <Header
+          activeProject={activeProject}
+          projects={projects}
+          onSelectProject={handleSelectProject}
+          onOpenNewProject={() => setIsNewProjectModalOpen(true)}
+          isOnline={isOnline}
+          offlineQueue={offlineQueue}
+          onOpenOfflineQueue={() => setIsOfflineQueueModalOpen(true)}
+          onOpenPrintBudget={() => setIsPrintBudgetModalOpen(true)}
+          editModeEnabled={editModeEnabled}
+          onToggleEditMode={setEditModeEnabled}
+        />
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-7xl w-full mx-auto p-3 sm:p-6">
-        {/* Optional Mobile Simulator wrapper on Desktop */}
-        <div
-          className={
-            isMobileViewMode
-              ? 'max-w-md mx-auto bg-slate-900 border-4 border-slate-700 rounded-3xl p-3 sm:p-4 shadow-2xl overflow-hidden min-h-[780px]'
-              : 'w-full'
-          }
-        >
-          {currentTab === 'catalogo' && (
-            <CatalogScreen
-              materials={materials}
-              taxonomia={taxonomia}
-              onOpenCapture={() => setIsCaptureModalOpen(true)}
-              onSelectMaterial={(mat) => setSelectedMaterialForDetail(mat)}
-              onOpenAddToProject={(mat) => {
-                setMaterialForAddToProject(mat);
-                setIsAddToProjectModalOpen(true);
-              }}
-            />
-          )}
-
+        {/* Área de Trabalho Central 100% Fluida */}
+        <main className="flex-1 flex flex-col overflow-hidden relative">
           {currentTab === 'orcamento' && (
             <BudgetScreen
               project={activeProject}
@@ -178,32 +164,63 @@ export default function App() {
               onOpenCatalog={() => setCurrentTab('catalogo')}
               onOpenPrintBudget={() => setIsPrintBudgetModalOpen(true)}
               onOpenAddMaterialToRoom={handleOpenAddMaterialToRoom}
+              editModeEnabled={editModeEnabled}
             />
+          )}
+
+          {currentTab === 'catalogo' && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
+              <CatalogScreen
+                materials={materials}
+                taxonomia={taxonomia}
+                onOpenCapture={() => setIsCaptureModalOpen(true)}
+                onSelectMaterial={(mat) => setSelectedMaterialForDetail(mat)}
+                onOpenAddToProject={(mat) => {
+                  setMaterialForAddToProject(mat);
+                  setIsAddToProjectModalOpen(true);
+                }}
+              />
+            </div>
           )}
 
           {currentTab === 'execucao' && (
-            <ExecutionScreen
-              project={activeProject}
-              onOpenRegisterPurchase={() => setIsRegisterPurchaseModalOpen(true)}
-              onProjectUpdated={handleProjectUpdated}
-            />
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
+              <ExecutionScreen
+                project={activeProject}
+                onOpenRegisterPurchase={() => setIsRegisterPurchaseModalOpen(true)}
+                onProjectUpdated={handleProjectUpdated}
+              />
+            </div>
           )}
 
           {currentTab === 'etapas' && (
-            <PhysicalTrackingScreen
-              project={activeProject}
-              onProjectUpdated={handleProjectUpdated}
-            />
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
+              <PhysicalTrackingScreen
+                project={activeProject}
+                onProjectUpdated={handleProjectUpdated}
+              />
+            </div>
           )}
 
           {currentTab === 'taxonomia' && (
-            <TaxonomyModal
-              taxonomia={taxonomia}
-              onTaxonomiaUpdated={(newTax) => setTaxonomia(newTax)}
-            />
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
+              <TaxonomyModal
+                taxonomia={taxonomia}
+                onTaxonomiaUpdated={(newTax) => setTaxonomia(newTax)}
+              />
+            </div>
           )}
+        </main>
+
+        {/* Navegação Mobile Inferior Fixa */}
+        <div className="md:hidden">
+          <Navigation
+            currentTab={currentTab}
+            onSelectTab={setCurrentTab}
+            onOpenCapture={() => setIsCaptureModalOpen(true)}
+          />
         </div>
-      </main>
+      </div>
 
       {/* Capture and OCR Modal */}
       <CaptureModal
@@ -241,7 +258,7 @@ export default function App() {
         onProjectUpdated={handleProjectUpdated}
       />
 
-      {/* Register Purchase Modal (Módulo 4) */}
+      {/* Register Purchase Modal */}
       <RegisterPurchaseModal
         isOpen={isRegisterPurchaseModalOpen}
         onClose={() => setIsRegisterPurchaseModalOpen(false)}

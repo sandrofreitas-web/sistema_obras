@@ -1,14 +1,17 @@
 import React from 'react';
 import { Projeto, ItemFilaOffline } from '../types';
 import {
-  HardHat,
-  Wifi,
-  WifiOff,
-  Smartphone,
-  Monitor,
   FolderOpen,
-  CloudUpload,
-  RefreshCw,
+  Plus,
+  Printer,
+  FileSpreadsheet,
+  Building,
+  CheckCircle2,
+  Calendar,
+  Lock,
+  Unlock,
+  ChevronRight,
+  HardHat
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -19,9 +22,11 @@ interface HeaderProps {
   isOnline: boolean;
   offlineQueue: ItemFilaOffline[];
   onOpenOfflineQueue: () => void;
-  isMobileViewMode: boolean;
-  onToggleMobileViewMode: () => void;
-  onResetToPilot?: () => void;
+  onOpenAddItem?: () => void;
+  onOpenPrintBudget?: () => void;
+  onExportCSV?: () => void;
+  editModeEnabled?: boolean;
+  onToggleEditMode?: (enabled: boolean) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -29,159 +34,135 @@ export const Header: React.FC<HeaderProps> = ({
   projects,
   onSelectProject,
   onOpenNewProject,
-  isOnline,
-  offlineQueue,
-  onOpenOfflineQueue,
-  isMobileViewMode,
-  onToggleMobileViewMode,
-  onResetToPilot,
+  onOpenAddItem,
+  onOpenPrintBudget,
+  onExportCSV,
+  editModeEnabled = true,
+  onToggleEditMode,
 }) => {
-  const pendingOfflineCount = offlineQueue.filter((q) => q.status === 'pendente' || q.status === 'erro').length;
-
-  // Forçar atualização do aplicativo limpando caches do navegador/PWA
-  const handleForceUpdateApp = async () => {
-    try {
-      if ('caches' in window) {
-        const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k)));
-      }
-      if ('serviceWorker' in navigator) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        for (const reg of regs) {
-          await reg.unregister();
-        }
-      }
-    } catch (e) {
-      console.error('Erro ao limpar cache:', e);
-    }
-    window.location.reload();
-  };
-
   return (
-    <header className="sticky top-0 z-30 bg-slate-900 border-b border-slate-800 text-white shadow-md">
-      <div className="max-w-7xl mx-auto px-3 sm:px-6 h-16 flex items-center justify-between gap-2 sm:gap-4">
-        {/* Brand / Logo */}
-        <div className="flex items-center gap-2.5 min-w-0">
-          <div className="w-9 h-9 rounded-lg bg-amber-400 text-slate-950 flex items-center justify-center font-black flex-shrink-0 shadow-sm">
-            <HardHat className="w-5 h-5 stroke-[2.2]" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <span className="font-extrabold text-base sm:text-lg tracking-tight text-white truncate">
-                Obra<span className="text-amber-400">Certa</span>
-              </span>
-              <span className="hidden md:inline-block text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0.5 rounded bg-slate-800 text-slate-300 border border-slate-700">
-                Piloto ICENV
-              </span>
-            </div>
-            <p className="hidden sm:block text-[11px] text-slate-400 truncate">
-              {activeProject?.pastaDocumentos ? (
-                <span title={activeProject.pastaDocumentos} className="text-amber-400/90 font-mono text-[10px]">
-                  📁 {activeProject.pastaDocumentos}
-                </span>
-              ) : (
-                'Materiais, Orçamentos & Custos de Obra'
-              )}
-            </p>
-          </div>
-        </div>
-
-        {/* Project Selector dropdown */}
-        <div className="flex items-center gap-2 flex-1 max-w-xs sm:max-w-md mx-1 sm:mx-4">
-          <div className="relative w-full">
-            <div className="flex items-center bg-slate-800/90 border border-slate-700 rounded-lg px-2.5 py-1.5 focus-within:border-amber-400 transition-colors">
-              <FolderOpen className="w-4 h-4 text-amber-400 mr-2 flex-shrink-0" />
-              <select
-                value={activeProject?.id || ''}
-                onChange={(e) => {
-                  if (e.target.value === '__new__') {
-                    onOpenNewProject();
-                  } else {
-                    onSelectProject(e.target.value);
-                  }
-                }}
-                className="w-full bg-transparent text-xs sm:text-sm font-medium text-slate-200 outline-none truncate cursor-pointer"
-              >
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id} className="bg-slate-900 text-slate-200">
-                    {p.nome}
-                  </option>
-                ))}
-                <option value="__new__" className="bg-slate-900 text-amber-400 font-semibold">
-                  + Criar Novo Projeto...
+    <header className="h-[54px] bg-[#090d16] border-b border-slate-800 text-white px-4 flex items-center justify-between sticky top-0 z-20 select-none shadow-sm flex-shrink-0">
+      {/* Esquerda: Identificação do Projeto & Metadados Executivos */}
+      <div className="flex items-center gap-3.5 min-w-0">
+        {/* Seletor Rápido de Obra Ativa */}
+        <div className="flex items-center gap-2">
+          <div className="relative">
+            <select
+              value={activeProject?.id || ''}
+              onChange={(e) => {
+                if (e.target.value === '__new__') {
+                  onOpenNewProject();
+                } else {
+                  onSelectProject(e.target.value);
+                }
+              }}
+              className="bg-[#0f172a] hover:bg-[#162035] border border-slate-700/80 rounded-lg px-2.5 py-1 text-xs font-bold text-white outline-none cursor-pointer pr-7 transition-colors truncate max-w-[280px] sm:max-w-[360px]"
+            >
+              {projects.map((p) => (
+                <option key={p.id} value={p.id} className="bg-slate-900 text-white">
+                  {p.nome}
                 </option>
-              </select>
-            </div>
+              ))}
+              <option value="__new__" className="bg-slate-900 text-amber-400 font-bold">
+                + Criar Nova Obra...
+              </option>
+            </select>
           </div>
-          {onResetToPilot && (
-            <button
-              onClick={onResetToPilot}
-              className="p-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-amber-400 border border-slate-700 transition-colors"
-              title="Recarregar Dados Oficiais do Projeto Piloto ICENV 2026"
-            >
-              <RefreshCw className="w-3.5 h-3.5" />
-            </button>
-          )}
         </div>
 
-        {/* Right action badges */}
-        <div className="flex items-center gap-1.5 sm:gap-3 flex-shrink-0">
-          {/* Offline / Online indicator & queue */}
-          {pendingOfflineCount > 0 ? (
-            <button
-              onClick={onOpenOfflineQueue}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/40 text-xs font-medium hover:bg-amber-500/30 transition-all animate-pulse"
-              title={`${pendingOfflineCount} fotos na fila offline para sincronizar`}
-            >
-              <CloudUpload className="w-3.5 h-3.5" />
-              <span className="font-bold">{pendingOfflineCount}</span>
-              <span className="hidden sm:inline">pendentes</span>
-            </button>
-          ) : (
-            <div
-              className={`flex items-center gap-1 px-2 py-1 rounded-md text-[11px] font-medium ${
-                isOnline ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/60' : 'bg-rose-950/60 text-rose-400 border border-rose-800/60'
-              }`}
-              title={isOnline ? 'Conectado à internet' : 'Sem conexão - Modo offline ativo na loja'}
-            >
-              {isOnline ? <Wifi className="w-3.5 h-3.5" /> : <WifiOff className="w-3.5 h-3.5" />}
-              <span className="hidden md:inline">{isOnline ? 'Online' : 'Offline'}</span>
-            </div>
-          )}
+        {/* Separador Vertical */}
+        <div className="hidden md:block h-5 w-[1px] bg-slate-800" />
 
-          {/* Botão de Atualização do App / Versão (Limpa Cache Instantaneamente) */}
-          <button
-            onClick={handleForceUpdateApp}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-amber-400 border border-slate-700 text-[11px] font-mono transition-colors active:scale-95"
-            title="Versão v1.2.2 ativa. Clique para forçar atualização e limpar cache do celular"
-          >
-            <RefreshCw className="w-3 h-3 text-amber-400" />
-            <span>v1.2.2</span>
-          </button>
+        {/* Metadados: Cliente / Responsável */}
+        <div className="hidden lg:flex items-center gap-1.5 text-xs text-slate-400">
+          <span>Cliente / Local:</span>
+          <strong className="text-slate-200 font-medium">
+            {activeProject?.cliente || 'ICENV 2026'}
+          </strong>
+        </div>
 
-          {/* Desktop/Mobile preview simulator toggle (visible on desktop screens) */}
+        {/* Separador Vertical */}
+        <div className="hidden xl:block h-5 w-[1px] bg-slate-800" />
+
+        {/* Base SINAPI / Referência de Custo */}
+        <div className="hidden xl:flex items-center gap-1.5 text-xs text-slate-400">
+          <span className="text-[10px] uppercase font-mono tracking-wider text-slate-400">Base:</span>
+          <span className="font-mono text-[11px] px-1.5 py-0.5 rounded bg-sky-500/10 text-sky-400 border border-sky-500/20 font-bold">
+            SINAPI SP 2026
+          </span>
+        </div>
+
+        {/* Separador Vertical */}
+        <div className="hidden xl:block h-5 w-[1px] bg-slate-800" />
+
+        {/* Status da Obra Pill */}
+        <div className="hidden sm:flex items-center gap-1.5 text-xs">
+          <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            Obra: Em Andamento
+          </span>
+        </div>
+      </div>
+
+      {/* Direita: Switch de Edição + Ações de Engenharia */}
+      <div className="flex items-center gap-2 sm:gap-3 flex-shrink-0">
+        {/* Switch: Editar Orçamento */}
+        {onToggleEditMode && (
           <button
-            onClick={onToggleMobileViewMode}
-            className={`hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-all ${
-              isMobileViewMode
-                ? 'bg-amber-400 text-slate-950 font-semibold shadow-sm'
-                : 'bg-slate-800 text-slate-300 hover:text-white border border-slate-700'
+            onClick={() => onToggleEditMode(!editModeEnabled)}
+            className={`flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold border transition-all ${
+              editModeEnabled
+                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-slate-200'
             }`}
-            title="Alternar entre visualização Desktop ampla e simulador Mobile"
+            title="Alternar permissão de edição rápida de quantitativos e preços"
           >
-            {isMobileViewMode ? (
-              <>
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>Simulador Celular</span>
-              </>
+            {editModeEnabled ? (
+              <Unlock className="w-3.5 h-3.5 text-amber-400" />
             ) : (
-              <>
-                <Monitor className="w-3.5 h-3.5" />
-                <span>Layout Desktop</span>
-              </>
+              <Lock className="w-3.5 h-3.5 text-slate-400" />
             )}
+            <span className="hidden sm:inline text-[11px]">
+              {editModeEnabled ? 'Edição Habilitada' : 'Visualização'}
+            </span>
           </button>
-        </div>
+        )}
+
+        {/* Botão Exportar CSV */}
+        {onExportCSV && (
+          <button
+            onClick={onExportCSV}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+            title="Exportar Planilha Orçamentária CSV"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="hidden md:inline text-[11px]">CSV</span>
+          </button>
+        )}
+
+        {/* Botão Imprimir PDF */}
+        {onOpenPrintBudget && (
+          <button
+            onClick={onOpenPrintBudget}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+            title="Imprimir Relatório ou Gerar PDF Executivo"
+          >
+            <Printer className="w-3.5 h-3.5 text-sky-400" />
+            <span className="hidden md:inline text-[11px]">PDF</span>
+          </button>
+        )}
+
+        {/* Botão Primário: + Incluir Item */}
+        {onOpenAddItem && (
+          <button
+            onClick={onOpenAddItem}
+            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-sm active:scale-95"
+            title="Incluir Novo Insumo ou Composição"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+            <span>+ Incluir Item</span>
+          </button>
+        )}
       </div>
     </header>
   );
