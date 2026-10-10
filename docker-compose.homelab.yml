@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: obras_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-obras_db}
+      POSTGRES_USER: ${POSTGRES_USER:-obras_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-obras_secure_pass_2026}
+    ports:
+      - "${DB_PORT:-5435}:5432"
+    volumes:
+      - /srv/dados/obras/pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-obras_user} -d ${POSTGRES_DB:-obras_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - obras_network
+
+  backend:
+    build:
+      context: .
+      dockerfile: src/backend/Dockerfile
+    container_name: obras_backend
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg2://${POSTGRES_USER:-obras_user}:${POSTGRES_PASSWORD:-obras_secure_pass_2026}@db:5432/${POSTGRES_DB:-obras_db}
+      ENVIRONMENT: production
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      PORT: 8000
+    ports:
+      - "${BACKEND_PORT:-8080}:8000"
+    volumes:
+      - /srv/dados/obras/uploads:/app/uploads
+    networks:
+      - obras_network
+
+  frontend:
+    build:
+      context: .
+      dockerfile: src/frontend/Dockerfile
+    container_name: obras_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3080}:5173"
+    networks:
+      - obras_network
+
+networks:
+  obras_network:
+    name: obras_network
+    driver: bridge

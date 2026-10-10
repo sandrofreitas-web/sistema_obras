@@ -1,4 +1,4 @@
-﻿# 🧠 Vault de Conhecimento: Contexto e Decisões de Arquitetura
+# 🧠 Vault de Conhecimento: Contexto e Decisões de Arquitetura
 
 Este documento consolida o histórico de decisões técnicas, premissas de projeto e direcionamentos estratégicos alinhados durante a concepção do **Sistema de Obras**. Ele serve como fonte da verdade e memória persistente para guiar o desenvolvimento das próximas fases.
 
@@ -37,9 +37,16 @@ Este documento consolida o histórico de decisões técnicas, premissas de proje
 * **Decisão:** A entidade `cenario` permite vincular diferentes alternativas de acabamento (ex: Cenário Econômico vs Cenário Durabilidade Institucional) aos mesmos cômodos/ambientes da obra.
 * **Motivação:** Facilita reuniões de comissão e aprovação de conselho, gerando relatórios instantâneos de comparação de custo por metro quadrado.
 
+### D07 — Hospedagem no Home Lab e Operação Mobile (Offline-First + Tailscale)
+* **Decisão:** O sistema será executado 24/7 no **Home Lab (Notebook Dell)**, retirando os containers do workstation local e preservando 100% dos recursos da **VPS Oracle-SGM** para automações e serviços institucionais.
+* **Operação Mobile em Trânsito / Lojas:** Quando externo, o objetivo do aplicativo é **exclusivamente a captura ágil de informações** (fotos de etiquetas, preços à vista/prazo e anotações), operando com recursos **offline-first** (PWA / IndexedDB / Service Worker). Não há necessidade de conectividade ou sincronização instantânea em tempo real durante a visita às lojas.
+* **Acesso Remoto Sob Demanda:** O sistema é de uso pessoal/interno. Caso seja necessário acessar o backend remotamente fora da rede Wi-Fi residencial, utiliza-se a VPN **Tailscale** já ativa no ecossistema (`100.x.y.z`).
+* **Desafio Técnico — Terminação HTTPS para Upgrade do App:** Navegadores móveis exigem estritamente conexão **HTTPS** para registrar Service Workers, permitir instalação na tela inicial e realizar **atualizações transparentes de versão (upgrades de bundle)**. Mesmo na rede interna/Tailscale, o Home Lab precisará de terminação SSL válida (ex.: via `tailscale cert`, Caddy local ou Cloudflare Tunnel) para viabilizar o ciclo de vida do PWA.
+
 ---
 
 ## 3. Marcos e Cronograma de Alinhamento
 * **30/09/2026:** Análise e extração dos dados reais da obra anterior de 2024; homologação de 7 fornecedores parceiros históricos; atualização do modelo de dados para v1.1.
 * **30/09/2026:** Migração formal para o repositório de produto `sistema_de_obras`.
+* **10/10/2026:** Decisão arquitetural de migração da infraestrutura: saída da workstation local para o **Home Lab (Notebook Dell)**, preservando a VPS Oracle-SGM; alinhamento de operação mobile offline com Tailscale e requisito de HTTPS para upgrades do PWA.
 * **13/10/2026:** Início oficial da obra piloto ICENV 2026 (Prazo: 5 semanas).

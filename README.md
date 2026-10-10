@@ -44,21 +44,51 @@ O sistema opera com o caso real da **Igreja Cristã Evangélica Nova Vida**, est
 
 ## 📱 Acesso Mobile & PWA Offline-First no Celular
 
-O aplicativo é um **PWA (Progressive Web App) Offline-First**, o que significa que **ele funciona 100% no celular mesmo com o computador desligado e sem conexão à internet**:
+O aplicativo é um **PWA (Progressive Web App) Offline-First**, projetado para que **o celular funcione 100% de forma autônoma mesmo sem conexão à internet e com backend indisponível**:
 
-* **Link Seguro em Produção (VPS Oracle SGM / Dokploy):**  
-  👉 **`https://sgm.icenvsp.com.br`**  
-  *(Hospedado na VPS SGM via Dokploy com Traefik e SSL automático).*
-* **Deploy Cloud na Vercel:**  
-  👉 Conectado automaticamente ao repositório GitHub `sandrofreitas-web/sistema_obras`.
-  *(Configurado com `vercel.json` na raiz e em `src/frontend/` para build Vite com SPA fallback).*
-* **Acesso na Rede Local (Wi-Fi):** `http://192.168.101.16:3080`
+* **Hospedagem 24/7:** Executado no **Home Lab (Notebook Dell)** (`192.168.15.176`), preservando integralmente os recursos da VPS Oracle-SGM para outras demandas.
+* **Operação Externa em Lojas/Canteiro:** O objetivo em trânsito é **exclusivamente a captura ágil de informações** (fotos de etiquetas, preços à vista/a prazo e anotações de quantitativos), gravadas localmente no dispositivo (IndexedDB/Service Worker). Não é exigida conectividade síncrona instantânea.
+* **Acesso Remoto Sob Demanda:** Por se tratar de um sistema para uso pessoal/interno, o acesso ao backend fora da rede Wi-Fi residencial pode ser realizado pontualmente via **Tailscale** (`100.x.y.z`).
+* **Desafio Técnico (HTTPS para Upgrades):** Para permitir o registro de Service Workers, instalação como aplicativo e, principalmente, **atualização transparente de novas versões (upgrade de bundles do PWA)**, navegadores mobile exigem HTTPS estrito. A terminação SSL no Home Lab é configurada via certificados Tailscale (`tailscale cert`), Caddy/Nginx com SSL ou Cloudflare Tunnel.
+* **Acesso na Rede Local (Wi-Fi de Casa):** `http://192.168.15.176:3080`
+* **Swagger / Documentação da API:** `http://192.168.15.176:8080/docs`
 
 ### 📲 Como Instalar e Usar 100% Offline no Celular:
 1. Abra o link no navegador do celular (Chrome no Android ou Safari no iOS).
 2. Toque no menu do navegador e selecione **"Adicionar à Tela Inicial"** ou **"Instalar Aplicativo"**.
 3. O ícone oficial do **ObraCerta** será criado na tela inicial do celular.
 4. **Pronto!** O Service Worker salva todo o código, telas e catálogo na memória local. Você pode consultar materiais, editar tabelas de detalhamento da obra, alternar entre os projetos e registrar cotações mesmo em modo avião ou sem sinal!
+
+---
+
+## 🏠 Operação e Infraestrutura no Home Lab (`ubuntu-server`)
+
+O sistema roda containerizado 24/7 no **Notebook Dell (Home Lab)** com persistência de dados em disco local dedicado:
+
+### 📊 Mapeamento de Serviços e Portas
+| Serviço | Container | Porta Externa | Porta Interna | Volume Persistente |
+| :--- | :--- | :--- | :--- | :--- |
+| **Frontend PWA** | `obras_frontend` | `3080` | `5173` | Build / App React |
+| **Backend API** | `obras_backend` | `8080` | `8000` | `/srv/dados/obras/uploads` |
+| **PostgreSQL 16** | `obras_db` | `5435` | `5432` | `/srv/dados/obras/pgdata` |
+
+### 🛠️ Comandos de Gestão Operacional via SSH
+```bash
+# Conectar no servidor
+ssh homelab
+
+# Navegar até o diretório da aplicação
+cd /srv/dados/obras/app
+
+# Subir / reiniciar todos os serviços
+docker compose -f docker-compose.homelab.yml up -d
+
+# Visualizar logs em tempo real
+docker compose -f docker-compose.homelab.yml logs -f
+
+# Fazer backup do banco de dados PostgreSQL
+docker exec obras_db pg_dump -U obras_user -d obras_db --clean --if-exists > /srv/dados/obras/data/obras_db_backup.sql
+```
 
 ---
 
