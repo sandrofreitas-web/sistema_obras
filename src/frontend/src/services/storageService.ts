@@ -59,6 +59,12 @@ export const storageService = {
       safeSave(STORAGE_KEYS.MATERIALS, INITIAL_MATERIALS);
       return INITIAL_MATERIALS;
     }
+    const missing = INITIAL_MATERIALS.filter((m) => !materials.some((x) => x.id === m.id));
+    if (missing.length > 0) {
+      const merged = [...materials, ...missing];
+      safeSave(STORAGE_KEYS.MATERIALS, merged);
+      return merged;
+    }
     return materials;
   },
 
@@ -173,6 +179,12 @@ export const storageService = {
       safeSave(STORAGE_KEYS.LOJAS, INITIAL_LOJAS);
       return INITIAL_LOJAS;
     }
+    const missing = INITIAL_LOJAS.filter((l) => !lojas.some((x) => x.id === l.id));
+    if (missing.length > 0) {
+      const merged = [...lojas, ...missing];
+      safeSave(STORAGE_KEYS.LOJAS, merged);
+      return merged;
+    }
     return lojas;
   },
 
@@ -190,7 +202,7 @@ export const storageService = {
 
   // === Projetos & Orçamentos ===
   getProjects(): Projeto[] {
-    const list = safeParse<Projeto[]>(STORAGE_KEYS.PROJECTS, []);
+    let list = safeParse<Projeto[]>(STORAGE_KEYS.PROJECTS, []);
     
     // Auto-migração: se a lista estiver vazia ou contiver apenas o projeto legado unificado
     const hasLegacyUnified = list.some((p) => p.id === 'proj-icenv-2026');
@@ -199,6 +211,100 @@ export const storageService = {
       safeSave(STORAGE_KEYS.ACTIVE_PROJECT_ID, INITIAL_PROJECT_PASTORAL.id);
       return INITIAL_PROJECTS;
     }
+
+    // Sincronização automática com compras, ambientes e novos itens do catálogo inicial pastoral
+    let updated = false;
+    list = list.map((proj) => {
+      if (proj.id === INITIAL_PROJECT_PASTORAL.id) {
+        let projUpdated = false;
+        let ambientes = proj.ambientes || [];
+        const missingAmbientes = INITIAL_PROJECT_PASTORAL.ambientes.filter(
+          (a) => !ambientes.some((ea) => ea.id === a.id)
+        );
+        if (missingAmbientes.length > 0) {
+          ambientes = [...ambientes, ...missingAmbientes];
+          projUpdated = true;
+        }
+
+        let compras = proj.compras || [];
+        const missingCompras = INITIAL_PROJECT_PASTORAL.compras.filter(
+          (c) => !compras.some((ec) => ec.id === c.id)
+        );
+        if (missingCompras.length > 0) {
+          compras = [...compras, ...missingCompras];
+          projUpdated = true;
+        }
+
+        const initialCenario = INITIAL_PROJECT_PASTORAL.cenarios[0];
+        const projCenario = proj.cenarios[0];
+        let cenarios = proj.cenarios;
+
+        if (initialCenario && projCenario) {
+          const initialMap = new Map(initialCenario.itens.map((i) => [i.id, i]));
+          const existingItemIds = new Set(projCenario.itens.map((i) => i.id));
+          
+          // Atualiza itens existentes com preços reais e status comprado se estiverem na NF
+          let itensChanged = false;
+          const mergedItens = projCenario.itens.map((it) => {
+            const initialItem = initialMap.get(it.id);
+            if (initialItem && initialItem.comprado && !it.comprado) {
+              itensChanged = true;
+              return {
+                ...it,
+                comprado: true,
+                precoUnitario: initialItem.precoUnitario,
+                precoTotal: initialItem.precoTotal,
+                lojaReferencia: initialItem.lojaReferencia || it.lojaReferencia,
+                unidade: initialItem.unidade || it.unidade,
+                quantidadeBase: initialItem.quantidadeBase || it.quantidadeBase,
+                quantidadeComPerda: initialItem.quantidadeComPerda || it.quantidadeComPerda,
+              };
+            }
+            return it;
+          });
+
+          // Adiciona itens que ainda não constavam no projeto
+          const newItens = initialCenario.itens.filter((i) => !existingItemIds.has(i.id));
+          if (newItens.length > 0) {
+            itensChanged = true;
+            mergedItens.push(...newItens);
+          }
+
+          if (itensChanged) {
+            projUpdated = true;
+            const updatedTotal = mergedItens.reduce(
+              (sum, it) => sum + (it.precoTotal || 0),
+              0
+            );
+            cenarios = proj.cenarios.map((c, idx) =>
+              idx === 0
+                ? {
+                    ...c,
+                    itens: mergedItens,
+                    totalEstimado: updatedTotal,
+                  }
+                : c
+            );
+          }
+        }
+
+        if (projUpdated) {
+          updated = true;
+          return {
+            ...proj,
+            ambientes,
+            compras,
+            cenarios,
+          };
+        }
+      }
+      return proj;
+    });
+
+    if (updated) {
+      safeSave(STORAGE_KEYS.PROJECTS, list);
+    }
+
     return list;
   },
 
