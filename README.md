@@ -46,18 +46,21 @@ O sistema opera com o caso real da **Igreja Cristã Evangélica Nova Vida**, est
 
 O aplicativo é um **PWA (Progressive Web App) Offline-First**, projetado para que **o celular funcione 100% de forma autônoma mesmo sem conexão à internet e com backend indisponível**:
 
-* **Hospedagem 24/7:** Executado no **Home Lab (Notebook Dell)** (`192.168.15.176`), preservando integralmente os recursos da VPS Oracle-SGM para outras demandas.
+* **URL Oficial com HTTPS Seguro (PWA / Mobile):**  
+  👉 **`https://ubuntu-server.tail01de12.ts.net`**  
+  *(Servido via Tailscale Serve com certificado SSL Let's Encrypt nativo e cadeado verde).*
+* **Hospedagem 24/7:** Executado no **Home Lab (Notebook Dell)** (`192.168.15.176`), preservando integralmente os recursos da VPS Oracle-SGM.
 * **Operação Externa em Lojas/Canteiro:** O objetivo em trânsito é **exclusivamente a captura ágil de informações** (fotos de etiquetas, preços à vista/a prazo e anotações de quantitativos), gravadas localmente no dispositivo (IndexedDB/Service Worker). Não é exigida conectividade síncrona instantânea.
-* **Acesso Remoto Sob Demanda:** Por se tratar de um sistema para uso pessoal/interno, o acesso ao backend fora da rede Wi-Fi residencial pode ser realizado pontualmente via **Tailscale** (`100.x.y.z`).
-* **Desafio Técnico (HTTPS para Upgrades):** Para permitir o registro de Service Workers, instalação como aplicativo e, principalmente, **atualização transparente de novas versões (upgrade de bundles do PWA)**, navegadores mobile exigem HTTPS estrito. A terminação SSL no Home Lab é configurada via certificados Tailscale (`tailscale cert`), Caddy/Nginx com SSL ou Cloudflare Tunnel.
 * **Acesso na Rede Local (Wi-Fi de Casa):** `http://192.168.15.176:3080`
 * **Swagger / Documentação da API:** `http://192.168.15.176:8080/docs`
 
-### 📲 Como Instalar e Usar 100% Offline no Celular:
-1. Abra o link no navegador do celular (Chrome no Android ou Safari no iOS).
-2. Toque no menu do navegador e selecione **"Adicionar à Tela Inicial"** ou **"Instalar Aplicativo"**.
-3. O ícone oficial do **ObraCerta** será criado na tela inicial do celular.
-4. **Pronto!** O Service Worker salva todo o código, telas e catálogo na memória local. Você pode consultar materiais, editar tabelas de detalhamento da obra, alternar entre os projetos e registrar cotações mesmo em modo avião ou sem sinal!
+### 📲 Como Instalar e Atualizar Definitivamente no Celular:
+1. Abra o app do **Tailscale** no celular e garanta que ele esteja conectado (sua conta `sandro.dafreitas@gmail.com`).
+2. Abra no Chrome ou Safari:  
+   👉 **`https://ubuntu-server.tail01de12.ts.net`**
+3. Repare no **cadeado verde de segurança (HTTPS válido)**.
+4. Toque no menu do navegador e selecione **"Adicionar à Tela Inicial"** ou **"Instalar Aplicativo"**.
+5. **Pronto!** O app agora possui uma origem HTTPS fixa e segura. Todas as futuras alterações de código serão baixadas pelo Service Worker em segundo plano automaticamente!
 
 ---
 
