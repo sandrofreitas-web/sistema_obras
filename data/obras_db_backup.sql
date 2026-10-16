@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict Iojpx5eiqeJrnmEWUHV09I0yBiWxjmiN8KBOGcQgHxiZDqfKSnrSDKNQD6mRUEl
+\restrict meoilfLXcPVEeE3oGfxGertsZUtced5Qy2VBku3apsqPRsqfddcDkkKkMVBKnBb
 
 -- Dumped from database version 16.15
 -- Dumped by pg_dump version 16.15
@@ -482,6 +482,7 @@ COPY public.compra (id, fornecedor_id, numero_nf, data_compra, valor_total, valo
 compra-zumkeller-86007	8	86.007	2026-10-10	4196.59	0.00	50.00	dinheiro	1	Zunkler_10OUT26.pdf (Pág 1)	2026-10-10 16:04:01.0997
 compra-zumkeller-86006	8	86.006	2026-10-10	46.45	0.00	0.00	dinheiro	1	Zunkler_10OUT26.pdf (Pág 2)	2026-10-10 16:04:01.0997
 compra-zumkeller-86653	8	86.653	2026-10-16	710.92	0.00	50.00	dinheiro	1	Zunkler_16OUT26.pdf	2026-10-16 12:47:09
+compra-longametragem-92041	9	92.041	2026-10-15	52.80	0.00	0.00	dinheiro	1	92041 - DANFE - IGREJA CRISTA EVANGELICA NOVA VIDA  ICEB.pdf	2026-10-15 14:48:12
 \.
 
 
@@ -519,6 +520,7 @@ COPY public.fornecedor (id, nome, tipo_parceiro, especialidade, cnpj, telefone_c
 6	ANDRA Materiais Elétricos	Distribuidora Elétrica	Cabos flexíveis 750V, quadros de distribuição, disjuntores DIN e eletrodutos	\N	\N	\N	249.65	Homologado	\N	\N	2026-09-30 20:05:46.065447
 7	Serralheria Parceira	Esquadrias e Vidraçaria	Janelas de vidro temperado, caixilhos de alumínio e ferragens sob medida	\N	\N	\N	3680.00	Homologado	\N	\N	2026-09-30 20:05:46.065448
 8	Depósito Zumkeller	Depósito Local	Materiais Básicos, Alvenaria, Madeiras, Cimento e Iluminação	62.328.299/0001-65	(11) 2231-1415	Av. Zumkeller, 308 - Mandaqui - São Paulo/SP	\N	ativo	\N	\N	2026-10-10 15:59:39.361304
+9	Longametragem Ferragens LTDA	Depósito / Ferragens	Ferragens, Tijolos Canaletas e Arames	53.073.730/0001-89	(11) 2950-1635	Rua Maria Cândida, 119, Loja - Vila Guilherme - São Paulo - SP - CEP 02071-010	\N	Homologado	\N	\N	2026-10-16 22:09:03.926085
 \.
 
 
@@ -551,6 +553,7 @@ ic-86653-03	compra-zumkeller-86653	item-db-pas-tubo-25	mat-hid-krona-tubo-25	6.0
 ic-86653-04	compra-zumkeller-86653	item-db-pas-tubo-100	mat-hid-krona-tubo-esg-100	6.00	18.58
 ic-86653-05	compra-zumkeller-86653	item-db-pas-tubo-75	mat-hid-krona-tubo-esg-75	3.00	19.76
 ic-86653-06	compra-zumkeller-86653	item-db-pas-frete-16out	mat-sv-frete-zumkeller	1.00	50.00
+ic-92041-01	compra-longametragem-92041	item-db-pas-canaletas	mat-br-canaleta-guaru	24.00	2.20
 \.
 
 
@@ -559,7 +562,6 @@ ic-86653-06	compra-zumkeller-86653	item-db-pas-frete-16out	mat-sv-frete-zumkelle
 --
 
 COPY public.item_projeto (id, ambiente_id, material_id, cenario_id, qtd_necessaria_liquida, margem_perda_pct, qtd_calculada_bruta, qtd_embalagem_fechada, preco_unitario_estimado) FROM stdin;
-item-db-pas-canaletas	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-br-canaleta-540	b0786118-9a21-46ca-8536-ec4be7a376c1	5.40	5.00	5.67	6	9.50
 item-db-pas-areia	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-br-areia-media	b0786118-9a21-46ca-8536-ec4be7a376c1	2.00	5.00	2.00	2	290.61
 item-db-pas-brita	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-br-pedra-brita	b0786118-9a21-46ca-8536-ec4be7a376c1	35.00	5.00	35.00	35	6.56
 item-db-pas-cimento	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-br-cimento-cp2	b0786118-9a21-46ca-8536-ec4be7a376c1	15.00	0.00	15.00	15	45.90
@@ -584,6 +586,7 @@ item-db-pas-tubo-25	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-hid-krona-tubo-25	b
 item-db-pas-tubo-100	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-hid-krona-tubo-esg-100	b0786118-9a21-46ca-8536-ec4be7a376c1	6.00	0.00	6.00	6	18.58
 item-db-pas-tubo-75	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-hid-krona-tubo-esg-75	b0786118-9a21-46ca-8536-ec4be7a376c1	3.00	0.00	3.00	3	19.76
 item-db-pas-frete-16out	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-sv-frete-zumkeller	b0786118-9a21-46ca-8536-ec4be7a376c1	1.00	0.00	1.00	1	50.00
+item-db-pas-canaletas	59068f34-8688-4d30-a75f-cb9c14e2f17b	mat-br-canaleta-guaru	b0786118-9a21-46ca-8536-ec4be7a376c1	24.00	0.00	24.00	24	2.20
 \.
 
 
@@ -618,6 +621,7 @@ mat-hid-krona-tubo-50	10	Krona Tubo PVC Soldável Água Fria 50mm Metro	Krona	19
 mat-hid-krona-tubo-25	10	Krona Tubo PVC Soldável Água Fria 25mm Metro (3/4)	Krona	20524 - Tubo PVC Soldável 25mm	m	1.000	\N	2026-10-16 21:56:57.603688
 mat-hid-krona-tubo-esg-100	11	Krona Tubo PVC Esgoto Primário 100mm Metro	Krona	23119 - Tubo PVC Esgoto Prim 100mm	m	1.000	\N	2026-10-16 21:56:57.603688
 mat-hid-krona-tubo-esg-75	11	Krona Tubo PVC Esgoto Secundário 75mm Metro	Krona	26661 - Tubo PVC Esgoto 75mm	m	1.000	\N	2026-10-16 21:56:57.603688
+mat-br-canaleta-guaru	31	Guaru Tijolo Canaleta Baiano Econômico	Cerâmica Guarulhos (Guaru)	793667 - Guaru Tijolo Canaleta Baiano Econ.	un	1.000	\N	2026-10-16 22:09:03.926085
 \.
 
 
@@ -627,6 +631,7 @@ mat-hid-krona-tubo-esg-75	11	Krona Tubo PVC Esgoto Secundário 75mm Metro	Krona	
 
 COPY public.parcela_pagamento (id, compra_id, numero_parcela, data_vencimento, valor_parcela, data_pagamento_efetivo, status) FROM stdin;
 parc-86653-01	compra-zumkeller-86653	1	2026-10-16	710.92	2026-10-16	Pago
+parc-92041-01	compra-longametragem-92041	1	2026-10-15	52.80	2026-10-15	Pago
 \.
 
 
@@ -645,6 +650,7 @@ pr-86653-tubo-50	mat-hid-krona-tubo-50	8	\N	22.94	22.94	2026-10-16 12:47:09	Zunk
 pr-86653-tubo-25	mat-hid-krona-tubo-25	8	\N	3.41	3.41	2026-10-16 12:47:09	Zunkler_16OUT26.pdf
 pr-86653-tubo-100	mat-hid-krona-tubo-esg-100	8	\N	18.58	18.58	2026-10-16 12:47:09	Zunkler_16OUT26.pdf
 pr-86653-tubo-75	mat-hid-krona-tubo-esg-75	8	\N	19.76	19.76	2026-10-16 12:47:09	Zunkler_16OUT26.pdf
+pr-92041-canaleta	mat-br-canaleta-guaru	9	\N	2.20	2.20	2026-10-15 14:48:12	92041 - DANFE - IGREJA CRISTA EVANGELICA NOVA VIDA  ICEB.pdf
 \.
 
 
@@ -685,7 +691,7 @@ SELECT pg_catalog.setval('public.categoria_id_seq', 44, true);
 -- Name: fornecedor_id_seq; Type: SEQUENCE SET; Schema: public; Owner: obras_user
 --
 
-SELECT pg_catalog.setval('public.fornecedor_id_seq', 8, true);
+SELECT pg_catalog.setval('public.fornecedor_id_seq', 9, true);
 
 
 --
@@ -956,5 +962,5 @@ ALTER TABLE ONLY public.servico_mao_obra
 -- PostgreSQL database dump complete
 --
 
-\unrestrict Iojpx5eiqeJrnmEWUHV09I0yBiWxjmiN8KBOGcQgHxiZDqfKSnrSDKNQD6mRUEl
+\unrestrict meoilfLXcPVEeE3oGfxGertsZUtced5Qy2VBku3apsqPRsqfddcDkkKkMVBKnBb
 
