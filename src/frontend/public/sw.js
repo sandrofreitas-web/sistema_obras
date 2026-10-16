@@ -1,4 +1,4 @@
-const CACHE_NAME = 'obracerta-v4-20261006-2';
+const CACHE_NAME = 'obracerta-v5-20261016-1';
 const CORE_ASSETS = [
   '/',
   '/index.html',
