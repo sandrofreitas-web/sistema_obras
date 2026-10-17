@@ -247,6 +247,28 @@ export const storageService = {
           let itensChanged = false;
           const mergedItens = projCenario.itens.map((it) => {
             const initialItem = initialMap.get(it.id);
+            if (it.id === 'item-pas-1' && it.quantidadeBase !== 5.0) {
+              itensChanged = true;
+              return {
+                ...it,
+                quantidadeBase: 5.0,
+                perdaTecnicaPercent: 0,
+                quantidadeComPerda: 5.0,
+                precoTotal: 5.0 * (it.precoUnitario || 68.0),
+                observacoes: 'Metragem definida na lista de materiais: 5 metros (5 m²) de piso',
+              };
+            }
+            if (it.id === 'item-pas-2' && it.quantidadeBase !== 27.0) {
+              itensChanged = true;
+              return {
+                ...it,
+                quantidadeBase: 27.0,
+                perdaTecnicaPercent: 0,
+                quantidadeComPerda: 27.0,
+                precoTotal: 27.0 * (it.precoUnitario || 55.0),
+                observacoes: 'Metragem definida na lista de materiais: 27 metros (27 m²) de azulejo',
+              };
+            }
             if (initialItem && initialItem.comprado && !it.comprado) {
               itensChanged = true;
               return {
@@ -277,7 +299,7 @@ export const storageService = {
               0
             );
             cenarios = proj.cenarios.map((c, idx) =>
-              idx === 0
+              (c.id === initialCenario.id || idx === 0)
                 ? {
                     ...c,
                     itens: mergedItens,

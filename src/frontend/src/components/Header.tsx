@@ -11,7 +11,8 @@ import {
   Lock,
   Unlock,
   ChevronRight,
-  HardHat
+  HardHat,
+  RefreshCw
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -40,6 +41,24 @@ export const Header: React.FC<HeaderProps> = ({
   editModeEnabled = true,
   onToggleEditMode,
 }) => {
+  const handleForceUpdateApp = async () => {
+    try {
+      if ('caches' in window) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k)));
+      }
+      if ('serviceWorker' in navigator) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        for (const reg of regs) {
+          await reg.unregister();
+        }
+      }
+    } catch (e) {
+      console.error('Erro ao limpar cache:', e);
+    }
+    window.location.reload();
+  };
+
   return (
     <header className="h-[54px] bg-[#090d16] border-b border-slate-800 text-white px-4 flex items-center justify-between sticky top-0 z-20 select-none shadow-sm flex-shrink-0">
       {/* Esquerda: Identificação do Projeto & Metadados Executivos */}
@@ -139,6 +158,16 @@ export const Header: React.FC<HeaderProps> = ({
             <span className="hidden md:inline text-[11px]">CSV</span>
           </button>
         )}
+
+        {/* Botão Atualizar App / Limpar Cache */}
+        <button
+          onClick={handleForceUpdateApp}
+          className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-amber-400 border border-slate-800 transition-colors active:scale-95"
+          title="Clique para recarregar a versão mais recente e limpar cache do navegador/PWA"
+        >
+          <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
+          <span className="hidden lg:inline text-[11px] font-mono">v1.2.3</span>
+        </button>
 
         {/* Botão Imprimir PDF */}
         {onOpenPrintBudget && (
