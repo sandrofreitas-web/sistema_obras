@@ -4,6 +4,7 @@ import math
 from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy import desc
 
 from app.core.config import settings
 from app.core.database import get_db
@@ -27,6 +28,60 @@ from app.api.schemas import (
 router = APIRouter()
 
 
+@router.get("/requisicoes")
+@router.get("/ia/requisicoes")
+def list_requisicoes_campo(projeto_id: Optional[str] = None, db: Session = Depends(get_db)):
+    """Lista todas as requisições recebidas do campo (WhatsApp/N8N) com itens e status."""
+    query = db.query(RequisicaoCampo)
+    if projeto_id:
+        query = query.filter_by(projeto_id=projeto_id)
+    requisicoes = query.order_by(desc(RequisicaoCampo.criado_em)).all()
+
+    resultado = []
+    for r in requisicoes:
+        itens = db.query(ItemRequisicao).filter_by(requisicao_id=r.id).all()
+        resultado.append({
+            "id": r.id,
+            "projeto_id": r.projeto_id,
+            "remetente_nome": r.remetente_nome,
+            "canal": r.canal,
+            "texto_original": r.texto_original,
+            "audio_url": r.audio_url,
+            "status": r.status,
+            "criado_em": r.criado_em.isoformat() if r.criado_em else None,
+            "data_requisicao": r.data_requisicao.isoformat() if r.data_requisicao else None,
+            "itens": [
+                {
+                    "id": it.id,
+                    "descricao_informal": it.descricao_informal,
+                    "qtd_solicitada": float(it.qtd_solicitada or 1.0),
+                    "unidade_solicitada": it.unidade_solicitada,
+                    "material_sugerido_id": it.material_sugerido_id,
+                    "loja_sugerida_id": it.loja_sugerida_id,
+                    "loja_sugerida_nome": it.loja_sugerida.nome if it.loja_sugerida else None,
+                    "status": it.status,
+                }
+                for it in itens
+            ],
+        })
+    return resultado
+
+
+@router.patch("/requisicoes/{requisicao_id}/status")
+@router.patch("/ia/requisicoes/{requisicao_id}/status")
+def update_status_requisicao(requisicao_id: str, payload: Dict[str, Any], db: Session = Depends(get_db)):
+    """Atualiza o status de aprovação ou andamento de uma requisição de campo."""
+    r = db.query(RequisicaoCampo).filter_by(id=requisicao_id).first()
+    if not r:
+        raise HTTPException(status_code=404, detail="Requisição não encontrada")
+    if "status" in payload:
+        r.status = payload["status"]
+        db.commit()
+        db.refresh(r)
+    return {"id": r.id, "status": r.status}
+
+
+@router.post("/processar-requisicao-mensagem", response_model=RequisicaoMensagemResponse)
 @router.post("/ia/processar-requisicao-mensagem", response_model=RequisicaoMensagemResponse)
 def processar_requisicao_mensagem(payload: RequisicaoMensagemIn, db: Session = Depends(get_db)):
     """

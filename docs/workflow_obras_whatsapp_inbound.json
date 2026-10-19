@@ -1,0 +1,177 @@
+{
+  "name": "[Obras] WhatsApp Canteiro - Grupo Obra ICENV",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-obras-inbound",
+        "responseMode": "onReceived",
+        "responseData": "OK",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -200,
+        100
+      ],
+      "id": "node-webhook-inbound",
+      "name": "Webhook Evolution API"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "cond-grupo-icenv",
+              "leftValue": "={{ $json.body?.data?.key?.remoteJid || $json.body?.remoteJid || '' }}",
+              "rightValue": "120363411158164621@g.us",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            },
+            {
+              "id": "cond-not-from-me",
+              "leftValue": "={{ $json.body?.data?.key?.fromMe || false }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        60,
+        100
+      ],
+      "id": "node-filtro-privacidade",
+      "name": "Filtro: Grupo Obra ICENV"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json.body?.data || $input.first().json.body || {};\nconst message = data.message || {};\n\n// Extrai texto de diferentes formatos do WhatsApp\nlet texto = message.conversation || \n            message.extendedTextMessage?.text || \n            message.imageMessage?.caption || \n            message.videoMessage?.caption || \n            data.text || \n            '';\n\n// Nome do remetente\nconst remetente = data.pushName || data.senderName || 'Mestre de Obras (Wagner)';\n\n// Verifica se é áudio\nconst isAudio = Boolean(message.audioMessage);\nconst audioUrl = data.mediaUrl || null;\n\nreturn [{\n  json: {\n    remetente,\n    texto,\n    isAudio,\n    audioUrl,\n    remoteJid: data.key?.remoteJid || '120363411158164621@g.us'\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        300,
+        80
+      ],
+      "id": "node-extrair-dados",
+      "name": "Extrair Mensagem"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://100.103.48.39:8080/api/v2/webhooks/n8n/requisicao",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"remetente\": \"{{ $json.remetente }}\",\n  \"texto\": \"{{ $json.texto }}\",\n  \"audio_url\": {{ $json.audioUrl ? JSON.stringify($json.audioUrl) : 'null' }}\n}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        540,
+        80
+      ],
+      "id": "node-backend-homelab",
+      "name": "Backend FastAPI (HomeLab)"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://whatsapp.icenvsp.com.br/message/sendText/obras-canteiro",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "obras_evolution_secret_2026"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"number\": \"120363411158164621@g.us\",\n  \"text\": \"{{ $json.resposta_whatsapp }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        80
+      ],
+      "id": "node-enviar-whatsapp",
+      "name": "Responder no Grupo WhatsApp"
+    }
+  ],
+  "connections": {
+    "Webhook Evolution API": {
+      "main": [
+        [
+          {
+            "node": "Filtro: Grupo Obra ICENV",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtro: Grupo Obra ICENV": {
+      "main": [
+        [
+          {
+            "node": "Extrair Mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair Mensagem": {
+      "main": [
+        [
+          {
+            "node": "Backend FastAPI (HomeLab)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Backend FastAPI (HomeLab)": {
+      "main": [
+        [
+          {
+            "node": "Responder no Grupo WhatsApp",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

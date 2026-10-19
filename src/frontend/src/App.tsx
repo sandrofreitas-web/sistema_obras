@@ -120,17 +120,6 @@ export default function App() {
     setCurrentTab('catalogo');
   };
 
-  const handleResetToPilot = () => {
-    if (
-      window.confirm(
-        'Deseja recarregar as informações oficiais do Projeto Piloto ICENV 2026? As 28 especificações da Lista Mestra e o cronograma de 5 semanas serão recarregados com dados limpos.'
-      )
-    ) {
-      storageService.resetToPilotData();
-      loadAllData();
-    }
-  };
-
   return (
     <div className="h-screen w-screen overflow-hidden bg-[#060911] text-slate-100 flex flex-row font-sans selection:bg-amber-400 selection:text-slate-950">
       {/* 1. Menu Lateral Esquerdo Compacto Sistêmico (Desktop) */}
@@ -141,7 +130,6 @@ export default function App() {
           isOnline={isOnline}
           offlineQueue={offlineQueue}
           onOpenOfflineQueue={() => setIsOfflineQueueModalOpen(true)}
-          onResetToPilot={handleResetToPilot}
         />
       </div>
 

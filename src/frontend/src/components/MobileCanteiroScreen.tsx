@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   HardHat,
   TrendingUp,
@@ -19,9 +19,14 @@ import {
   ArrowUpRight,
   Store,
   Sparkles,
+  MessageSquare,
+  RefreshCw,
+  Check,
+  Loader2,
 } from 'lucide-react';
-import { Projeto, EtapaObra, FotoDiario, ItemProjeto } from '../types';
+import { Projeto, EtapaObra, FotoDiario, ItemProjeto, RequisicaoCampo } from '../types';
 import { storageService } from '../services/storageService';
+import { apiService } from '../services/apiService';
 
 interface MobileCanteiroScreenProps {
   project: Projeto | null;
@@ -47,6 +52,37 @@ export const MobileCanteiroScreen: React.FC<MobileCanteiroScreenProps> = ({
 
   // Estado de Lightbox para fotos do RDO
   const [selectedPhotoForLightbox, setSelectedPhotoForLightbox] = useState<FotoDiario | null>(null);
+
+  // Requisições recebidas do campo via WhatsApp / N8N
+  const [requisicoes, setRequisicoes] = useState<RequisicaoCampo[]>([]);
+  const [loadingRequisicoes, setLoadingRequisicoes] = useState<boolean>(false);
+
+  const fetchRequisicoes = async () => {
+    setLoadingRequisicoes(true);
+    try {
+      const data = await apiService.getRequisicoesCampo(project.id);
+      setRequisicoes(data);
+    } catch (e) {
+      console.warn('Erro ao carregar requisições:', e);
+    } finally {
+      setLoadingRequisicoes(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRequisicoes();
+    const interval = setInterval(fetchRequisicoes, 15000);
+    return () => clearInterval(interval);
+  }, [project.id]);
+
+  const handleApproveRequisicao = async (reqId: string) => {
+    const success = await apiService.updateRequisicaoStatus(reqId, 'Aprovado');
+    if (success) {
+      setRequisicoes((prev) =>
+        prev.map((r) => (r.id === reqId ? { ...r, status: 'Aprovado' } : r))
+      );
+    }
+  };
 
   // Checkbox local para checklist de conferência de materiais no canteiro
   const [checkedItems, setCheckedItems] = useState<Record<string, boolean>>(() => {
@@ -260,6 +296,137 @@ export const MobileCanteiroScreen: React.FC<MobileCanteiroScreenProps> = ({
             </span>
           </div>
         </div>
+      </div>
+
+      {/* 2.5 Requisições do Canteiro (WhatsApp / N8N Pipeline em Tempo Real) */}
+      <div className="bg-gradient-to-br from-slate-900 to-[#0a151d] border border-emerald-900/40 rounded-2xl p-4 shadow-xl space-y-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+              <MessageSquare className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                <h2 className="text-xs font-bold uppercase tracking-wider text-emerald-400">
+                  WhatsApp Canteiro (IA Inbound)
+                </h2>
+              </div>
+              <p className="text-[10px] text-slate-400">Grupo Oficial Obra ICENV</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-950/60 border border-emerald-800/40 text-emerald-300 font-bold">
+              {requisicoes.length} {requisicoes.length === 1 ? 'pedido' : 'pedidos'}
+            </span>
+            <button
+              onClick={fetchRequisicoes}
+              disabled={loadingRequisicoes}
+              className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-300 hover:text-emerald-400 transition-colors"
+              title="Atualizar mensagens do WhatsApp"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${loadingRequisicoes ? 'animate-spin text-emerald-400' : ''}`} />
+            </button>
+          </div>
+        </div>
+
+        {requisicoes.length === 0 ? (
+          <div className="bg-slate-950/60 border border-dashed border-slate-800 rounded-xl p-3 text-center">
+            <p className="text-xs text-slate-400 font-medium">
+              Nenhuma requisição pendente no momento.
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Mensagens ou áudios do encarregado enviados no grupo do WhatsApp aparecem aqui automaticamente.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {requisicoes.map((req) => (
+              <div
+                key={req.id}
+                className="p-3 rounded-xl bg-slate-950/80 border border-slate-800/90 hover:border-emerald-800/50 transition-all space-y-2"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold text-white truncate">
+                        {req.remetente_nome || 'Mestre de Obras'}
+                      </span>
+                      <span className="text-[9px] font-mono px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
+                        {req.canal || 'WhatsApp'}
+                      </span>
+                    </div>
+                    {req.criado_em && (
+                      <span className="text-[10px] text-slate-500 font-mono block">
+                        {new Date(req.criado_em).toLocaleDateString('pt-BR', {
+                          day: '2-digit',
+                          month: '2-digit',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  <span
+                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+                      req.status === 'Aprovado'
+                        ? 'bg-emerald-950/40 text-emerald-300 border border-emerald-800/40'
+                        : 'bg-amber-950/40 text-amber-300 border border-amber-800/40'
+                    }`}
+                  >
+                    {req.status}
+                  </span>
+                </div>
+
+                {/* Mensagem original transcrita */}
+                <div className="bg-slate-900/70 rounded-lg p-2 border border-slate-800/60 text-xs text-slate-300 italic">
+                  "{req.texto_original}"
+                </div>
+
+                {/* Itens estruturados extraídos pela IA */}
+                {req.itens && req.itens.length > 0 && (
+                  <div className="space-y-1 pt-1">
+                    <span className="text-[10px] uppercase font-mono font-semibold text-slate-400 block">
+                      Itens Identificados pela IA:
+                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {req.itens.map((it, idx) => (
+                        <div
+                          key={it.id || idx}
+                          className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-emerald-950/30 border border-emerald-800/30 text-xs font-medium text-emerald-200"
+                        >
+                          <span className="font-mono font-bold text-emerald-400">
+                            {it.qtd_solicitada} {it.unidade_solicitada || 'un'}
+                          </span>
+                          <span>•</span>
+                          <span className="text-slate-200">{it.descricao_informal}</span>
+                          {it.loja_sugerida_nome && (
+                            <span className="text-[10px] text-amber-300 font-mono">
+                              ({it.loja_sugerida_nome})
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Botões de Ação */}
+                {req.status !== 'Aprovado' && (
+                  <div className="flex justify-end pt-1">
+                    <button
+                      onClick={() => handleApproveRequisicao(req.id)}
+                      className="flex items-center gap-1 text-[11px] font-bold text-emerald-400 bg-emerald-950/50 hover:bg-emerald-900/60 border border-emerald-700/50 px-2.5 py-1 rounded-lg transition-all active:scale-95"
+                    >
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Homologar Pedido</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* 3. Frente Ativa da Semana com Ajuste Touch de Avanço */}

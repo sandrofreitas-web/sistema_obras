@@ -120,4 +120,9 @@ docker exec obras_db pg_dump -U obras_user -d obras_db --clean --if-exists > /sr
   - CRUD completo de itens integrado à base homologada de materiais.
   - Painel de evolução das aquisições com alternância de status Planejado x Comprado em 1 clique.
   - Exportação de Lista de Cotação para lojas (CSV) e Orçamento Executivo (CSV/PDF).
-* [ ] **v3.0:** Módulo 4 (Controle de Execução Financeira / Notas Fiscais) e Módulo 5 (RDO com fotos datadas).
+* [x] **v3.0 (Fase 3): Automação Agêntica de Canteiro & WhatsApp Inbound**:
+  - Integração via WhatsApp com **Evolution API v2** (`https://whatsapp.icenvsp.com.br`) e **n8n** (`https://n8n.icenvsp.com.br`).
+  - Escuta exclusiva do grupo oficial `"Obra ICENV"` (`120363411158164621@g.us`) com descarte seguro de mensagens de fora do canteiro.
+  - Processamento de mensagens e transcrição de áudio via IA com matching de catálogo e persistência direta no PostgreSQL (`requisicao_campo` e `item_requisicao`).
+  - Painel em tempo real no PWA (`MobileCanteiroScreen.tsx`) com polling automático (15s) e botão de homologação.
+  - Remoção definitiva da rotina *"Recarregar Piloto"*, estabelecendo o banco de dados como Single Source of Truth.

@@ -331,4 +331,52 @@ docker exec -t obras_db pg_dump -U obras_user -d obras_db -F c -b -v -f /var/lib
 ```
 
 ---
+
+## 8. Arquitetura de Integração Agêntica e Canteiro (Fase 3 & Automação WhatsApp)
+
+A Fase 3 estabelece o fluxo contínuo e sem atrito entre o homem de campo (Mestre de Obras / Pedreiro) e o gestor:
+
+```mermaid
+flowchart LR
+    WA["📱 WhatsApp Canteiro\nGrupo 'Obra ICENV'"]
+    EVO["⚡ Evolution API v2\nhttps://whatsapp.icenvsp.com.br\nInstância: obras-canteiro"]
+    N8N["⚙️ n8n (Oracle VPS)\nWorkflow: LTaP8RbG4OgBQEWz"]
+    API["🏢 FastAPI Backend (HomeLab)\nhttp://100.103.48.39:8080"]
+    PG[("🐘 PostgreSQL 16\nobras_db")]
+    FE["💻 Frontend React (PWA)\nhttp://192.168.15.176:3080"]
+
+    WA -->|Mensagem no grupo| EVO
+    EVO -->|Webhook HTTPS| N8N
+    N8N -->|POST /api/v2/webhooks/n8n/requisicao| API
+    API -->|INSERT requisicao_campo, item_requisicao| PG
+    API -->|JSON formatado de confirmação| N8N
+    FE -->|GET /api/v2/ia/requisicoes (Polling 15s)| API
+    FE -->|PATCH /api/v2/ia/requisicoes/{id}/status| API
+```
+
+### 8.1 Componentes e Credenciais Homologadas
+* **Evolution API v2:**
+  - URL Base: `https://whatsapp.icenvsp.com.br`
+  - Global API Key: `obras_evolution_secret_2026`
+  - Instância do Canteiro: `obras-canteiro`
+  - Grupo Oficial Monitorado: `120363411158164621@g.us` (*"Obra ICENV"*)
+  - Webhook configurado: `https://n8n.icenvsp.com.br/webhook/whatsapp-obras-inbound`
+* **n8n Automation Engine:**
+  - URL: `https://n8n.icenvsp.com.br`
+  - Workflow Ativo: `[Obras] WhatsApp Canteiro - Grupo Obra ICENV` (`id: LTaP8RbG4OgBQEWz`)
+  - Filtro de Segurança e Privacidade: `{{ $json.body.data.key.remoteJid === "120363411158164621@g.us" && !$json.body.data.key.fromMe }}`
+* **FastAPI Backend (HomeLab):**
+  - IP Tailscale: `100.103.48.39:8080` | IP Local: `192.168.15.176:8080`
+  - Endpoints Relevantes:
+    - `POST /api/v2/webhooks/n8n/requisicao`: Ingestão vinda do n8n.
+    - `POST /api/v2/ia/processar-requisicao-mensagem`: Processador NLP / matching de catálogo.
+    - `GET /api/v2/ia/requisicoes`: Lista requisições e itens para o frontend.
+    - `PATCH /api/v2/ia/requisicoes/{id}/status`: Atualiza aprovação da requisição.
+* **Frontend Single Source of Truth:**
+  - Removido completamente o botão e rotina *"Recarregar Piloto"*, impedindo sobrescrita de dados locais com mocks.
+  - Implementado `apiService.ts` conectando os componentes visuais diretamente ao PostgreSQL.
+  - Adicionado card interativo em `MobileCanteiroScreen.tsx` com atualização em tempo real (15 segundos) e botão de homologação rápida.
+
+---
 *Documento homologado pela Engenharia de Sistemas e Diretoria de Obras ICENV.*
+

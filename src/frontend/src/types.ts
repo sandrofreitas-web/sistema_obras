@@ -235,3 +235,27 @@ export interface PlantaProjeto {
   versoes: VersaoPlanta[];
 }
 
+export interface ItemRequisicaoCampo {
+  id: string;
+  descricao_informal: string;
+  qtd_solicitada: number;
+  unidade_solicitada?: string;
+  material_sugerido_id?: string;
+  loja_sugerida_id?: number;
+  loja_sugerida_nome?: string;
+  status?: string;
+}
+
+export interface RequisicaoCampo {
+  id: string;
+  projeto_id?: string;
+  remetente_nome: string;
+  canal: string;
+  texto_original: string;
+  audio_url?: string;
+  status: string;
+  criado_em?: string;
+  data_requisicao?: string;
+  itens: ItemRequisicaoCampo[];
+}
+

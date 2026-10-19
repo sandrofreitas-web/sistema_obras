@@ -9,7 +9,6 @@ import {
   Wifi,
   WifiOff,
   CloudUpload,
-  RefreshCw,
   LayoutDashboard,
   FileText,
   Briefcase,
@@ -24,7 +23,6 @@ interface SidebarProps {
   isOnline: boolean;
   offlineQueue: ItemFilaOffline[];
   onOpenOfflineQueue: () => void;
-  onResetToPilot?: () => void;
 }
 
 interface NavItem {
@@ -48,7 +46,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
   isOnline,
   offlineQueue,
   onOpenOfflineQueue,
-  onResetToPilot,
 }) => {
   const pendingOfflineCount = offlineQueue.filter((q) => q.status === 'pendente' || q.status === 'erro').length;
 
@@ -254,20 +251,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
             <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
           </div>
-        )}
-
-        {/* Reset Piloto Button */}
-        {onResetToPilot && (
-          <button
-            onClick={onResetToPilot}
-            className="w-full flex items-center gap-2.5 p-2 rounded-xl text-slate-400 hover:text-amber-400 hover:bg-slate-800/60 transition-colors"
-            title="Recarregar Dados Oficiais do Piloto ICENV 2026"
-          >
-            <RefreshCw className="w-4 h-4 flex-shrink-0" />
-            <span className="text-[11px] whitespace-nowrap">
-              Recarregar Piloto
-            </span>
-          </button>
         )}
       </div>
     </aside>
