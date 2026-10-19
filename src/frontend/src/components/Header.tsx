@@ -166,7 +166,7 @@ export const Header: React.FC<HeaderProps> = ({
           title="Clique para recarregar a versão mais recente e limpar cache do navegador/PWA"
         >
           <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden lg:inline text-[11px] font-mono">v1.2.3</span>
+          <span className="hidden lg:inline text-[11px] font-mono">v1.2.4</span>
         </button>
 
         {/* Botão Imprimir PDF */}
