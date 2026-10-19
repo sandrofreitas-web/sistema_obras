@@ -9,13 +9,18 @@ import { BudgetScreen } from './components/BudgetScreen';
 import { ExecutionScreen } from './components/ExecutionScreen';
 import { PhysicalTrackingScreen } from './components/PhysicalTrackingScreen';
 import { TaxonomyModal } from './components/TaxonomyModal';
-import { CaptureModal } from './components/CaptureModal';
 import { MaterialDetailModal } from './components/MaterialDetailModal';
 import { AddItemToProjectModal } from './components/AddItemToProjectModal';
 import { RegisterPurchaseModal } from './components/RegisterPurchaseModal';
 import { OfflineQueueModal } from './components/OfflineQueueModal';
 import { PrintBudgetModal } from './components/PrintBudgetModal';
+import { ExecutiveDashboardScreen } from './components/ExecutiveDashboardScreen';
+import { BlueprintsScreen } from './components/BlueprintsScreen';
+import { PrintBalcaoModal } from './components/PrintBalcaoModal';
+import { ProjectsScreen } from './components/ProjectsScreen';
+import { SuppliersScreen } from './components/SuppliersScreen';
 import { NewProjectModal } from './components/NewProjectModal';
+import { MobileCanteiroScreen } from './components/MobileCanteiroScreen';
 
 export default function App() {
   // Global State
@@ -27,21 +32,27 @@ export default function App() {
   const [offlineQueue, setOfflineQueue] = useState<ItemFilaOffline[]>([]);
   const [isOnline, setIsOnline] = useState<boolean>(true);
 
-  // Active navigation tab (Orçamento WBS como visão padrão)
-  const [currentTab, setCurrentTab] = useState<TabType>('orcamento');
+  // Active navigation tab (Canteiro no Mobile, Cockpit Executivo no Desktop)
+  const [currentTab, setCurrentTab] = useState<TabType>(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'canteiro';
+    }
+    return 'dashboard';
+  });
 
   // Modo de Edição habilitado / bloqueado
   const [editModeEnabled, setEditModeEnabled] = useState<boolean>(true);
 
   // Modal controls
-  const [isCaptureModalOpen, setIsCaptureModalOpen] = useState(false);
   const [selectedMaterialForDetail, setSelectedMaterialForDetail] = useState<Material | null>(null);
   const [materialForAddToProject, setMaterialForAddToProject] = useState<Material | null>(null);
   const [isAddToProjectModalOpen, setIsAddToProjectModalOpen] = useState(false);
   const [isRegisterPurchaseModalOpen, setIsRegisterPurchaseModalOpen] = useState(false);
   const [isOfflineQueueModalOpen, setIsOfflineQueueModalOpen] = useState(false);
   const [isPrintBudgetModalOpen, setIsPrintBudgetModalOpen] = useState(false);
+  const [isPrintBalcaoModalOpen, setIsPrintBalcaoModalOpen] = useState(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
+
 
   // Initialize and load data on mount
   useEffect(() => {
@@ -127,7 +138,6 @@ export default function App() {
         <Sidebar
           currentTab={currentTab}
           onSelectTab={setCurrentTab}
-          onOpenCapture={() => setIsCaptureModalOpen(true)}
           isOnline={isOnline}
           offlineQueue={offlineQueue}
           onOpenOfflineQueue={() => setIsOfflineQueueModalOpen(true)}
@@ -147,12 +157,43 @@ export default function App() {
           offlineQueue={offlineQueue}
           onOpenOfflineQueue={() => setIsOfflineQueueModalOpen(true)}
           onOpenPrintBudget={() => setIsPrintBudgetModalOpen(true)}
+          onOpenPrintBalcao={() => setIsPrintBalcaoModalOpen(true)}
           editModeEnabled={editModeEnabled}
           onToggleEditMode={setEditModeEnabled}
         />
 
         {/* Área de Trabalho Central 100% Fluida */}
         <main className="flex-1 flex flex-col overflow-hidden relative">
+          {currentTab === 'canteiro' && (
+            <div className="flex-1 overflow-y-auto p-3 sm:p-6 w-full">
+              <MobileCanteiroScreen
+                project={activeProject}
+                onProjectUpdated={handleProjectUpdated}
+                onNavigateTab={(tab) => setCurrentTab(tab)}
+                onOpenPrintBalcao={() => setIsPrintBalcaoModalOpen(true)}
+              />
+            </div>
+          )}
+
+          {currentTab === 'dashboard' && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
+              <ExecutiveDashboardScreen
+                project={activeProject}
+                onOpenPrintBudget={() => setIsPrintBudgetModalOpen(true)}
+                onOpenPrintBalcao={() => setIsPrintBalcaoModalOpen(true)}
+                onNavigateTab={(tab) => setCurrentTab(tab)}
+              />
+            </div>
+          )}
+
+          {currentTab === 'plantas' && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
+              <BlueprintsScreen
+                projetoNome={activeProject?.nome || 'Reforma ICENV 2026'}
+              />
+            </div>
+          )}
+
           {currentTab === 'orcamento' && (
             <BudgetScreen
               project={activeProject}
@@ -173,7 +214,6 @@ export default function App() {
               <CatalogScreen
                 materials={materials}
                 taxonomia={taxonomia}
-                onOpenCapture={() => setIsCaptureModalOpen(true)}
                 onSelectMaterial={(mat) => setSelectedMaterialForDetail(mat)}
                 onOpenAddToProject={(mat) => {
                   setMaterialForAddToProject(mat);
@@ -202,6 +242,29 @@ export default function App() {
             </div>
           )}
 
+          {currentTab === 'projetos' && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
+              <ProjectsScreen
+                projects={projects}
+                activeProject={activeProject}
+                onSelectProject={handleSelectProject}
+                onOpenNewProject={() => setIsNewProjectModalOpen(true)}
+                onNavigateTab={(tab) => setCurrentTab(tab)}
+              />
+            </div>
+          )}
+
+          {currentTab === 'fornecedores' && (
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
+              <SuppliersScreen
+                lojas={lojas}
+                project={activeProject}
+                onOpenPrintBalcao={(lojaNome) => setIsPrintBalcaoModalOpen(true)}
+                onNavigateTab={(tab) => setCurrentTab(tab)}
+              />
+            </div>
+          )}
+
           {currentTab === 'taxonomia' && (
             <div className="flex-1 overflow-y-auto p-4 sm:p-6 w-full">
               <TaxonomyModal
@@ -217,20 +280,9 @@ export default function App() {
           <Navigation
             currentTab={currentTab}
             onSelectTab={setCurrentTab}
-            onOpenCapture={() => setIsCaptureModalOpen(true)}
           />
         </div>
       </div>
-
-      {/* Capture and OCR Modal */}
-      <CaptureModal
-        isOpen={isCaptureModalOpen}
-        onClose={() => setIsCaptureModalOpen(false)}
-        taxonomia={taxonomia}
-        lojas={lojas}
-        onSaveMaterial={handleSaveMaterial}
-        onPriceUpdated={handlePriceUpdated}
-      />
 
       {/* Material Detail & Price History Modal */}
       <MaterialDetailModal
@@ -279,6 +331,13 @@ export default function App() {
       <PrintBudgetModal
         isOpen={isPrintBudgetModalOpen}
         onClose={() => setIsPrintBudgetModalOpen(false)}
+        project={activeProject}
+      />
+
+      {/* Print / Export Balcao Shopping List Modal */}
+      <PrintBalcaoModal
+        isOpen={isPrintBalcaoModalOpen}
+        onClose={() => setIsPrintBalcaoModalOpen(false)}
         project={activeProject}
       />
 

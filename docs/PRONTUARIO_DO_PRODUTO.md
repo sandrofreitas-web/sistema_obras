@@ -42,14 +42,17 @@ A base de lojas do app já nasce pré-populada com os parceiros históricos da i
 
 ---
 
-## 3. Escopo e Fases de Entrega
+## 3. Escopo e Fases de Entrega (Refatoração v2.0)
 
 | Fase | Entregável | Alinhamento com a Obra 2026 (Início: 13/10/2026) | Status |
 |---|---|---|---|
-| **Fase 1 — MVP de Campo** | Captura de etiquetas (OCR) + Catálogo de Materiais + Lojas | Homologação de preços nas lojas parceiras (JER, Leroy, Telhanorte) | Em Andamento |
-| **Fase 2 — Orçamentos & Cenários** | Projetos por ambiente + Simulações Econômico vs Premium | Cenários para Casa Pastoral e Banheiro Masculino | Em Andamento |
-| **Fase 3 — Execução Financeira** | Registro de compras reais, Notas Fiscais e Realizado vs Planejado | Acompanhamento a partir de 13/10/2026 | Planejado |
-| **Fase 4 — Acompanhamento Físico** | Cronograma de 5 semanas, RDO integrado, checklist e fotos | Operação de canteiro durante as 5 semanas da obra | Planejado |
+| **Fase 1 — Backend & Dados** | Schema PostgreSQL (Plantas, Versões, Compras Reais, RBAC) + Sub-roteadores modulares FastAPI | Ingestão das 8 faturas reais (R$ 19.932,96) e consolidação dos 3 projetos no PostgreSQL 16 | **Concluído** ✅ |
+| **Fase 2 — Agente & CLI** | CLI `obras` (`status`, `print-lista`, `dimensionar`) + Skill `obras-gestor` para Antigravity IDE | Operação no terminal pelo gestor + regras de perda (+10%) e embalagem | **Concluído** ✅ |
+| **Fase 3 — Operação Arquiteto** | Estratificação tripla (Chat sem atrito, IDE com Slash Commands, CLI) + Regras RBAC | Colaboração com arquitetos parceiros e envio de pranchas R00/R01 | **Concluído** ✅ |
+| **Fase 4 — Web Cockpit & DBeaver**| Dashboard Gerencial com Curva S, Tracker de Faturas Reais, Módulo de Plantas, Impressão Balcão A4 e DBeaver | Gestão de Diretoria, prestação de contas, cotação de balcão e auditoria SQL direta desktop | **Concluído** ✅ |
+| **Fase 5 — Mobile PWA Macro v2.2**| Design System Dark `#0b0f19`, Sidebar categorizada, Lightbox de canteiro, tabular-nums | Acompanhamento do canteiro sem atrito para o gestor em campo | **Concluído** ✅ |
+| **Fase 6 — Automação N8N & WhatsApp** | Workflow N8N para grupo da obra (áudio pedreiro Wagner → IA → Requisições) | Última fase de integração com WhatsApp | **Pendente / Próximo** ⏳ |
+
 
 ---
 
@@ -114,10 +117,15 @@ Taxonomia padronizada compatível com a `Lista_Mestra_de_Materiais.md`:
   - **Inclusão:** Conexão direta com a base homologada de materiais (catálogo), preenchendo automaticamente fabricante, preços e unidades, ou cadastro sob demanda.
   - **Alteração:** Edição de quantitativo base, percentual de perda técnica (+5% geral, +10% a +15% para cortes de revestimentos), ambiente de aplicação e preço unitário com recálculo instantâneo.
   - **Exclusão:** Remoção segura de itens com atualização em tempo real dos subtotais e da reserva de contingência.
-- **Exportações Especializadas:**
-  - **Lista de Cotação e Aquisição (CSV):** Exportação focada em compras para envio a depósitos e lojas físicas (JER, Telhanorte, Leroy Merlin, Obramax), contendo quantitativos finais com perda, fornecedor sugerido e colunas em branco para cotação real e número de NF. Suporta exportar apenas itens pendentes ("A Comprar").
+- **Exportações Especializadas & Impressão de Balcão:**
+  - **Lista de Compras / Cotação de Balcão (Impressão A4 Print-Ready):** Layout pautado para levar em depósitos físicos (JER, Telhanorte, Obramax), contendo quantitativos finais com perda, embalagens fechadas calculadas (caixas/sacos), preços de referência e colunas em branco para anotação de preço real, marca disponível e visto do vendedor. Suporta filtros por fornecedor e por itens pendentes.
+  - **Lista de Cotação e Aquisição (CSV):** Exportação focada em compras para envio digital a vendedores.
   - **Planilha do Orçamento Executivo (CSV):** Exportação completa para controle gerencial.
-  - **Relatório PDF / Impressão:** Emissão do prontuário executivo da obra.
+  - **Relatório PDF / Impressão Gerencial:** Emissão do prontuário executivo da obra para diretoria e conselho.
+- **Canal de Requisição Ágil via N8N (WhatsApp da Obra):**
+  - Mestre de obras ou pedreiro envia áudio ou texto no grupo de WhatsApp da obra.
+  - Workflow no N8N transcreve e envia para o endpoint de IA do backend, associando os insumos solicitados ao catálogo de materiais e inserindo a requisição na esteira de compras, com confirmação imediata no chat.
+
 
 ---
 
@@ -132,14 +140,29 @@ Taxonomia padronizada compatível com a `Lista_Mestra_de_Materiais.md`:
 - **Comparativo Planejado x Realizado:** Desvio absoluto (R$) e percentual (%) por grupo de materiais e consolidado.
 - **Alerta de Tendência de Estouro:** Aviso visual quando o valor realizado projetar estouro da reserva técnica (R$ 3.000,00).
 
+### 7.2 Consolidação do Refaturamento Real (Reforma Pastoral 2026 — R$ 19.932,96)
+Durante a execução da 1ª fase (Banheiro Casa Pastoral), 8 faturas/comprovantes reais foram emitidos e reconciliados no PostgreSQL 16:
+
+| NF / Documento | Data | Fornecedor Homologado | Valor (R$) | Forma Pgto | Condição / Parcelas | Escopo Faturado | Status |
+| :--- | :---: | :--- | :---: | :---: | :---: | :--- | :---: |
+| **NF-e 86.007** | 10/10/2026 | Depósito Zumkeller | R$ 4.196,59 | Dinheiro / À Vista | 1x Parcela única | 16 itens brutos: areia, cimento, brita, blocos, vigas, laje H8, tinta emborrachada e frete | **Quitado** ✅ |
+| **NF-e 86.006** | 10/10/2026 | Depósito Zumkeller | R$ 46,45 | Dinheiro / À Vista | 1x Parcela única | Plafon LED Sobrepor 24W 6400K Quadrado Ourolux (Área Externa) | **Quitado** ✅ |
+| **NF-e 92.041** | 15/10/2026 | Longametragem Ferragens | R$ 52,80 | Dinheiro / À Vista | 1x Parcela única | 24 canaletas cerâmicas baianas para viga de respaldo | **Quitado** ✅ |
+| **NF-e 86.653** | 16/10/2026 | Depósito Zumkeller | R$ 710,92 | Dinheiro / À Vista | 1x Parcela única | Tubos soldáveis 50/25 Krona, esgoto 100/75, 20 sc brita e frete | **Quitado** ✅ |
+| **NFC-e 53.813** | 17/10/2026 | Telhanorte Marginal Tietê | R$ 3.261,79 | Cartão de Crédito | 1x (Venc: 17/11/2026) | 37 itens: conexões Tigre, registros Deca, metais Docol Nova Logg, pintura Suvinil/Atlas | **Pendente** ⏳ |
+| **PED-005576** | 17/10/2026 | Telhanorte Marginal Tietê | R$ 863,54 | Cartão de Crédito | 1x (Venc: 17/11/2026) | 10,10 m² revestimento Fachada Mint 7,5x25cm e frete | **Pendente** ⏳ |
+| **PED-005578** | 17/10/2026 | Telhanorte Marginal Tietê | R$ 6.536,46 | Cartão de Crédito | 1x (Venc: 17/11/2026) | Porcelanato Eliane 90x90 (21,87m²), AC-III (13 sc), Bacia Smart Celite, Cuba Icasa, Vitrô Top Sul e frete | **Pendente** ⏳ |
+| **OV-1918242567** | 18/10/2026 | Sodimac Dicico Tietê | R$ 4.264,41 | Cartão de Crédito | 6x de R$ 710,73 | 2 Janelas venezianas 6F 100x150cm CRV para dormitórios e frete | **Pendente** ⏳ |
+| **TOTAL CONSOLIDADO** | — | — | **R$ 19.932,96** | Mix | **13 Parcelas Totais** | **Quitado à Vista: R$ 5.006,76 (25,1%) \| A Vencer Cartão: R$ 14.926,20 (74,9%)** | — |
+
 ---
 
 ## 8. Módulo 5 — Acompanhamento Físico e Diário de Obra (RDO)
 
 Integrado ao cronograma de 5 semanas com início em **13/10/2026**:
 * **Cronograma de Etapas:**
-  1. *Semana 1 (13/10 a 18/10):* Mobilização, caçambas, demolição de revestimentos e alvenaria Casa Pastoral.
-  2. *Semana 2 (19/10 a 25/10):* Novas instalações hidráulicas e elétricas; testes de estanqueidade.
+  1. *Semana 1 (13/10 a 18/10):* Mobilização, caçambas, demolição de revestimentos e alvenaria Casa Pastoral (100% concluída).
+  2. *Semana 2 (19/10 a 25/10):* Novas instalações hidráulicas e elétricas; testes de estanqueidade (40% em andamento).
   3. *Semana 3 (26/10 a 01/11):* Regularização de contrapiso, impermeabilização 72h e início de pisos/azulejos.
   4. *Semana 4 (02/11 a 08/11):* Conclusão de revestimentos, forro de gesso, divisórias em granito Hiper Pedras.
   5. *Semana 5 (09/11 a 15/11):* Montagem de louças, torneiras, pintura, vistoria final e termo de entrega.
@@ -176,4 +199,9 @@ Integrado ao cronograma de 5 semanas com início em **13/10/2026**:
 | **v1.1** | 30/09/2026 | Pair Programming / Antigravity | **Parametrização oficial para a Obra ICENV 2026** (Início: 13/10/2026, 5 semanas, frentes Casa Pastoral + Banheiro Masculino). |
 | **v1.1** | 30/09/2026 | Pair Programming / Antigravity | **Evolução do Modelo de Dados:** Inclusão de `Fator_Embalagem`, parcelamento de compras (`Parcela_Pagamento`) e entidade `Servico_MaoDeObra`. |
 | **v1.2** | 03/10/2026 | Pair Programming / Antigravity | **Módulo 1 Mobile-First PWA:** Implementação do leitor de etiquetas com OCR multimodal assistido, conversor automático de embalagem em tempo real, endpoints REST (`/materiais`, `/captura/analisar`, `/captura/salvar`) e manifest PWA para instalação direta em celulares. |
+| **v2.0** | 19/10/2026 | Pair Programming / Antigravity | **Refatoração Diretor Piloto:** Migração da operação pesada do mobile para Terminal/CLI Agêntico + N8N (pedidos de materiais via grupo WhatsApp por áudio/texto), operação agêntica tripla estratificada para arquitetos (Chat natural sem atrito, IDE com Slash Commands e Terminal CLI), módulo de impressão de lista de compras para balcão, controle e versionamento de pranchas arquitetônicas, e PWA redefinido como painel executivo macro. |
+| **v2.2** | 19/10/2026 | Pair Programming / Antigravity | **Consolidação do Refaturamento & Migração PostgreSQL 16:** Hidratação completa e reconciliação das 8 faturas reais (R$ 19.932,96) com 13 parcelas, unificação relacional dos 3 projetos (`proj-icenv-pastoral`, `proj-icenv-masculino`, `proj-icenv-2024`) com 88 itens de WBS, design system de engenharia v2.2 (Dark Theme `#0b0f19`, tabular-nums, Sidebar categorizada, Lightbox) e parametrização para auditoria SQL via DBeaver Desktop. |
+
+
+
 

@@ -26,7 +26,10 @@ class Usuario(Base):
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
     nome = Column(String(150), nullable=False)
+    email = Column(String(120), nullable=True)
+    telefone = Column(String(30), nullable=True)
     cargo = Column(String(100), nullable=True)
+    papel = Column(String(50), default="gestor")  # 'gestor', 'arquiteto', 'mestre_obras', 'cliente'
     permissao = Column(String(50), default="operador")
     criado_em = Column(DateTime, default=datetime.utcnow)
 
@@ -120,6 +123,44 @@ class Projeto(Base):
     cenarios = relationship("Cenario", back_populates="projeto", cascade="all, delete-orphan")
     servicos_mao_obra = relationship("ServicoMaoObra", back_populates="projeto")
     etapas = relationship("EtapaObra", back_populates="projeto", cascade="all, delete-orphan")
+    plantas = relationship("PlantaProjeto", back_populates="projeto", cascade="all, delete-orphan")
+    requisicoes = relationship("RequisicaoCampo", back_populates="projeto", cascade="all, delete-orphan")
+    compras = relationship("Compra", back_populates="projeto")
+
+
+class PlantaProjeto(Base):
+    __tablename__ = "planta_projeto"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    projeto_id = Column(String(36), ForeignKey("projeto.id"), nullable=False)
+    codigo_prancha = Column(String(50), nullable=False)  # ex: ARQ-01, HID-01
+    titulo = Column(String(200), nullable=False)
+    disciplina = Column(String(50), default="Arquitetura")  # Arquitetura, Hidráulica, Elétrica, Estrutural
+    arquivo_url = Column(Text, nullable=True)
+    criado_em = Column(DateTime, default=datetime.utcnow)
+
+    projeto = relationship("Projeto", back_populates="plantas")
+    versoes = relationship("VersaoPlanta", back_populates="planta", cascade="all, delete-orphan", order_by="desc(VersaoPlanta.criado_em)")
+    ambientes = relationship("Ambiente", back_populates="planta")
+
+
+class VersaoPlanta(Base):
+    __tablename__ = "versao_planta"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    planta_id = Column(String(36), ForeignKey("planta_projeto.id"), nullable=False)
+    revisao = Column(String(20), nullable=False)  # R00, R01, R02, R_ASBUILT
+    data_emissao = Column(Date, default=date.today)
+    autor_arquiteto = Column(String(120), nullable=True)
+    aprovador_gestor = Column(String(120), nullable=True)
+    status = Column(String(30), default="Vigente")  # Vigente, Em Revisão, Superada
+    arquivo_pdf_url = Column(Text, nullable=True)
+    notas_alteracao = Column(Text, nullable=True)
+    metadados_extracao = Column(JSON, nullable=True)  # Cotas, áreas, memorial extraídos por IA
+    criado_em = Column(DateTime, default=datetime.utcnow)
+
+    planta = relationship("PlantaProjeto", back_populates="versoes")
+    ambientes = relationship("Ambiente", back_populates="versao_planta")
 
 
 class Ambiente(Base):
@@ -131,9 +172,14 @@ class Ambiente(Base):
     area_piso = Column(Numeric(10, 2), default=0.00)
     area_parede = Column(Numeric(10, 2), default=0.00)
     perimetro = Column(Numeric(10, 2), default=0.00)
+    planta_id = Column(String(36), ForeignKey("planta_projeto.id"), nullable=True)
+    versao_planta_id = Column(String(36), ForeignKey("versao_planta.id"), nullable=True)
+    coordenadas_quadrante = Column(String(100), nullable=True)  # ex: Eixo A-C / Parede Norte
 
     projeto = relationship("Projeto", back_populates="ambientes")
     itens_projeto = relationship("ItemProjeto", back_populates="ambiente", cascade="all, delete-orphan")
+    planta = relationship("PlantaProjeto", back_populates="ambientes")
+    versao_planta = relationship("VersaoPlanta", back_populates="ambientes")
 
 
 class Cenario(Base):
@@ -185,6 +231,7 @@ class Compra(Base):
     __tablename__ = "compra"
 
     id = Column(String(36), primary_key=True, default=generate_uuid)
+    projeto_id = Column(String(36), ForeignKey("projeto.id"), nullable=True)
     fornecedor_id = Column(Integer, ForeignKey("fornecedor.id"), nullable=False)
     numero_nf = Column(String(50), nullable=True)
     data_compra = Column(Date, default=date.today)
@@ -194,9 +241,11 @@ class Compra(Base):
     forma_pagamento = Column(String(30), default="A Vista")
     quantidade_parcelas = Column(Integer, default=1)
     foto_nf_url = Column(Text, nullable=True)
+    observacoes = Column(Text, nullable=True)
     criado_em = Column(DateTime, default=datetime.utcnow)
 
     fornecedor = relationship("Fornecedor", back_populates="compras")
+    projeto = relationship("Projeto", back_populates="compras")
     parcelas = relationship("ParcelaPagamento", back_populates="compra", cascade="all, delete-orphan")
     itens = relationship("ItemCompra", back_populates="compra", cascade="all, delete-orphan")
 
@@ -261,3 +310,51 @@ class DiarioObraRDO(Base):
     criado_em = Column(DateTime, default=datetime.utcnow)
 
     etapa_obra = relationship("EtapaObra", back_populates="diarios")
+
+
+class RequisicaoCampo(Base):
+    __tablename__ = "requisicao_campo"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    projeto_id = Column(String(36), ForeignKey("projeto.id"), nullable=False)
+    remetente_nome = Column(String(120), nullable=False)  # ex: Wagner (Mestre de Obras)
+    canal = Column(String(50), default="WhatsApp / N8N")  # WhatsApp / N8N, Chat Web, Terminal CLI
+    texto_original = Column(Text, nullable=False)
+    audio_url = Column(Text, nullable=True)
+    status = Column(String(30), default="Recebido")  # Recebido, Processado, Aprovado, Rejeitado
+    data_requisicao = Column(DateTime, default=datetime.utcnow)
+    criado_em = Column(DateTime, default=datetime.utcnow)
+
+    projeto = relationship("Projeto", back_populates="requisicoes")
+    itens = relationship("ItemRequisicao", back_populates="requisicao", cascade="all, delete-orphan")
+
+
+class ItemRequisicao(Base):
+    __tablename__ = "item_requisicao"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    requisicao_id = Column(String(36), ForeignKey("requisicao_campo.id"), nullable=False)
+    descricao_informal = Column(String(255), nullable=False)
+    qtd_solicitada = Column(Numeric(10, 2), default=1.00)
+    unidade_solicitada = Column(String(30), default="un")
+    material_sugerido_id = Column(String(36), ForeignKey("material.id"), nullable=True)
+    loja_sugerida_id = Column(Integer, ForeignKey("fornecedor.id"), nullable=True)
+    status = Column(String(30), default="Pendente")  # Pendente, Homologado, Comprado
+
+    requisicao = relationship("RequisicaoCampo", back_populates="itens")
+    material_sugerido = relationship("Material")
+    loja_sugerida = relationship("Fornecedor")
+
+
+class RegistroAuditoria(Base):
+    __tablename__ = "registro_auditoria"
+
+    id = Column(String(36), primary_key=True, default=generate_uuid)
+    usuario_id = Column(String(36), nullable=True)
+    usuario_nome = Column(String(120), nullable=False, default="Sistema")
+    papel = Column(String(50), default="gestor")  # gestor, arquiteto, cliente, sistema_ia
+    acao = Column(String(100), nullable=False)  # upload_planta, revisao_especificacao, requisicao_campo, etc
+    entidade = Column(String(80), nullable=False)  # planta_projeto, item_projeto, compra, etc
+    entidade_id = Column(String(36), nullable=True)
+    detalhes = Column(JSON, nullable=True)
+    data_hora = Column(DateTime, default=datetime.utcnow)

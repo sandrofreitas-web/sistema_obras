@@ -1,4 +1,4 @@
-﻿# 🗄️ Modelo de Dados e Arquitetura Relacional — Sistema de Obras
+# 🗄️ Modelo de Dados e Arquitetura Relacional — Sistema de Obras
 
 Este documento descreve as entidades, relacionamentos, chaves e tipos de dados do **Sistema de Obras**, preparado tanto para execução offline local (SQLite / IndexedDB) quanto para sincronização em nuvem (PostgreSQL / Supabase).
 
@@ -9,6 +9,7 @@ Este documento descreve as entidades, relacionamentos, chaves e tipos de dados d
 ```mermaid
 erDiagram
     USUARIO ||--o{ PRECO_CAPTURA : "registra"
+    USUARIO ||--o{ REGISTRO_AUDITORIA : "audita"
     FORNECEDOR ||--o{ PRECO_CAPTURA : "oferece"
     FORNECEDOR ||--o{ COMPRA : "emite"
     CATEGORIA ||--o{ MATERIAL : "classifica"
@@ -19,11 +20,18 @@ erDiagram
     PROJETO ||--o{ CENARIO : "contem"
     PROJETO ||--o{ SERVICO_MAO_OBRA : "contrata"
     PROJETO ||--o{ ETAPA_OBRA : "cronograma"
+    PROJETO ||--o{ PLANTA_PROJETO : "documenta"
+    PROJETO ||--o{ REQUISICAO_CAMPO : "recebe_pedidos"
+    PROJETO ||--o{ COMPRA : "aloca_desembolso"
+    PLANTA_PROJETO ||--o{ VERSAO_PLANTA : "versiona"
     AMBIENTE ||--o{ ITEM_PROJETO : "especifica"
+    AMBIENTE }o--|| PLANTA_PROJETO : "referencia_prancha"
+    AMBIENTE }o--|| VERSAO_PLANTA : "revisao_ativa"
     CENARIO ||--o{ ITEM_PROJETO : "variavel_cenario"
     COMPRA ||--o{ ITEM_COMPRA : "detalha"
     COMPRA ||--o{ PARCELA_PAGAMENTO : "desembolso"
     ETAPA_OBRA ||--o{ DIARIO_OBRA_RDO : "registros"
+    REQUISICAO_CAMPO ||--o{ ITEM_REQUISICAO : "itens_solicitados"
 ```
 
 ---
@@ -184,3 +192,72 @@ Relatório Diário de Obra preenchido no canteiro.
 * `atividades_realizadas` (TEXT NOT NULL)
 * `ocorrencias_imprevistos` (TEXT)
 * `fotos_urls` (JSON / TEXT): Array de links das fotos do dia.
+
+---
+
+### 2.5 Módulo de Plantas e Versionamento de Pranchas
+
+#### Tabela: `planta_projeto`
+Cadastro de pranchas, memoriais e disciplinas de engenharia/arquitetura.
+* `id` (UUID PRIMARY KEY)
+* `projeto_id` (FK -> projeto.id)
+* `codigo_prancha` (VARCHAR(50) NOT NULL): Ex: "ARQ-01", "HID-01", "ELE-01".
+* `titulo` (VARCHAR(200) NOT NULL): Nome formal da prancha.
+* `disciplina` (VARCHAR(50)): "Arquitetura", "Hidráulica", "Elétrica", "Estrutural".
+* `arquivo_url` (TEXT): Caminho ou link do arquivo PDF vetorial.
+* `criado_em` (TIMESTAMP)
+
+#### Tabela: `versao_planta`
+Histórico de revisões das pranchas (controle de R00, R01, As-Built).
+* `id` (UUID PRIMARY KEY)
+* `planta_id` (FK -> planta_projeto.id)
+* `revisao` (VARCHAR(20) NOT NULL): "R00", "R01", "R02", "R_ASBUILT".
+* `data_emissao` (DATE NOT NULL)
+* `autor_arquiteto` (VARCHAR(120)): Nome do profissional que emitiu.
+* `aprovador_gestor` (VARCHAR(120)): Gestor que homologou a revisão.
+* `status` (VARCHAR(30)): "Vigente", "Em Revisão", "Superada".
+* `arquivo_pdf_url` (TEXT): Anexo da revisão específica.
+* `notas_alteracao` (TEXT): O que mudou em relação à versão anterior.
+* `metadados_extracao` (JSON): Cotas, áreas de piso/parede e acabamentos extraídos por IA.
+
+---
+
+### 2.6 Módulo de Requisições de Campo (WhatsApp / N8N)
+
+#### Tabela: `requisicao_campo`
+Registros de pedidos enviados pelo mestre de obras via áudio ou texto de WhatsApp.
+* `id` (UUID PRIMARY KEY)
+* `projeto_id` (FK -> projeto.id)
+* `remetente_nome` (VARCHAR(120) NOT NULL): Ex: "Wagner (Mestre de Obras)".
+* `canal` (VARCHAR(50)): "WhatsApp / N8N", "Chat Web", "Terminal CLI".
+* `texto_original` (TEXT NOT NULL): Mensagem original ou transcrição de áudio.
+* `audio_url` (TEXT): Link do áudio original no storage.
+* `status` (VARCHAR(30)): "Recebido", "Processado", "Aprovado", "Rejeitado".
+* `data_requisicao` (TIMESTAMP)
+
+#### Tabela: `item_requisicao`
+Itens individuais extraídos e mapeados a partir da mensagem.
+* `id` (UUID PRIMARY KEY)
+* `requisicao_id` (FK -> requisicao_campo.id)
+* `descricao_informal` (VARCHAR(255) NOT NULL): Termo coloquial usado em obra.
+* `qtd_solicitada` (DECIMAL(10,2))
+* `unidade_solicitada` (VARCHAR(30))
+* `material_sugerido_id` (FK -> material.id): Item correspondente no catálogo canônico.
+* `loja_sugerida_id` (FK -> fornecedor.id): Loja parceira recomendada.
+* `status` (VARCHAR(30)): "Pendente", "Homologado", "Comprado".
+
+---
+
+### 2.7 Módulo de Governança e Auditoria RBAC
+
+#### Tabela: `registro_auditoria`
+Trilha de auditoria append-only para conformidade entre arquitetos e gestores.
+* `id` (UUID PRIMARY KEY)
+* `usuario_id` (VARCHAR(36)): ID do usuário se autenticado.
+* `usuario_nome` (VARCHAR(120)): Nome do operador.
+* `papel` (VARCHAR(50)): "gestor", "arquiteto", "mestre_obras", "cliente".
+* `acao` (VARCHAR(100)): Ex: "upload_planta", "revisao_especificacao", "registro_compra_nf".
+* `entidade` (VARCHAR(80)): Nome da tabela impactada.
+* `entidade_id` (VARCHAR(36)): ID do registro alterado.
+* `detalhes` (JSON): Dados contextuais da alteração.
+* `data_hora` (TIMESTAMP)

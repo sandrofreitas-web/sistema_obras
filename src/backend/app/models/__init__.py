@@ -5,6 +5,8 @@ from app.models.entities import (
     Material,
     PrecoCaptura,
     Projeto,
+    PlantaProjeto,
+    VersaoPlanta,
     Ambiente,
     Cenario,
     ItemProjeto,
@@ -14,6 +16,9 @@ from app.models.entities import (
     ItemCompra,
     EtapaObra,
     DiarioObraRDO,
+    RequisicaoCampo,
+    ItemRequisicao,
+    RegistroAuditoria,
 )
 
 __all__ = [
@@ -23,6 +28,8 @@ __all__ = [
     "Material",
     "PrecoCaptura",
     "Projeto",
+    "PlantaProjeto",
+    "VersaoPlanta",
     "Ambiente",
     "Cenario",
     "ItemProjeto",
@@ -32,4 +39,7 @@ __all__ = [
     "ItemCompra",
     "EtapaObra",
     "DiarioObraRDO",
+    "RequisicaoCampo",
+    "ItemRequisicao",
+    "RegistroAuditoria",
 ]

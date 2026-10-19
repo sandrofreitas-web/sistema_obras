@@ -46,8 +46,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Rotas
+# Rotas da API (compatibilidade total v1, v2 e raiz /api)
 app.include_router(api_router, prefix=settings.API_V1_STR)
+app.include_router(api_router, prefix="/api")
+app.include_router(api_router, prefix="/api/v2")
 
 
 from pydantic import BaseModel, Field

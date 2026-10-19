@@ -21,7 +21,6 @@ import { Material, TaxonomiaClasse } from '../types';
 interface CatalogScreenProps {
   materials: Material[];
   taxonomia: TaxonomiaClasse[];
-  onOpenCapture: () => void;
   onSelectMaterial: (material: Material) => void;
   onOpenAddToProject: (material: Material) => void;
 }
@@ -37,7 +36,6 @@ const formatNumberBR = (val: number): string => {
 export const CatalogScreen: React.FC<CatalogScreenProps> = ({
   materials,
   taxonomia,
-  onOpenCapture,
   onSelectMaterial,
   onOpenAddToProject,
 }) => {
@@ -148,14 +146,7 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
               </button>
             </div>
 
-            {/* Captura de Etiqueta com IA */}
-            <button
-              onClick={onOpenCapture}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-bold text-xs shadow active:scale-95 transition-all"
-            >
-              <Camera className="w-3.5 h-3.5 stroke-[2.5]" />
-              <span>+ Capturar Etiqueta</span>
-            </button>
+            {/* Visualização de layout */}
           </div>
         </div>
 
@@ -239,15 +230,8 @@ export const CatalogScreen: React.FC<CatalogScreenProps> = ({
           <Layers className="w-10 h-10 text-slate-600 mx-auto" />
           <h3 className="text-sm font-bold text-white">Nenhum insumo encontrado</h3>
           <p className="text-xs text-slate-400 max-w-sm mx-auto">
-            Não encontramos itens com os filtros atuais. Limpe a busca ou registre uma nova etiqueta de loja.
+            Não encontramos itens com os filtros atuais. Limpe a busca ou redefina os filtros de categoria.
           </p>
-          <button
-            onClick={onOpenCapture}
-            className="px-3.5 py-1.5 rounded-lg bg-amber-400 text-slate-950 font-bold text-xs inline-flex items-center gap-1.5 mt-2"
-          >
-            <Camera className="w-3.5 h-3.5" />
-            Fotografar Etiqueta Agora
-          </button>
         </div>
       ) : viewMode === 'table' ? (
         /* VISUAL TÉCNICO DE ENGENHARIA (TABULAR COMPACTO) */

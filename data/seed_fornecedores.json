@@ -1,4 +1,4 @@
-﻿[
+[
   {
     "id": 1,
     "nome": "JER Depósito de Mat. Construção",
@@ -53,6 +53,14 @@
     "tipo_parceiro": "Esquadrias e Vidraçaria",
     "especialidade": "Janelas de vidro temperado, caixilhos de alumínio e ferragens sob medida",
     "historico_compras_2024": 3680.00,
+    "status": "Homologado"
+  },
+  {
+    "id": 8,
+    "nome": "Sodimac Dicico Tietê",
+    "tipo_parceiro": "Home Center",
+    "especialidade": "Esquadrias, janelas venezianas CRV, portas e acabamentos gerais",
+    "historico_compras_2024": 0.00,
     "status": "Homologado"
   }
 ]

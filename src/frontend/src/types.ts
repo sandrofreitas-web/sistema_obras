@@ -68,6 +68,11 @@ export interface Loja {
   endereco?: string;
   cidade?: string;
   telefone?: string;
+  tipoParceiro?: string;
+  especialidade?: string;
+  status?: string;
+  historico2024?: number;
+  cnpj?: string;
 }
 
 export interface ItemProjeto {
@@ -162,6 +167,8 @@ export interface Projeto {
   pastaDocumentos?: string;
   orcamentoMaoObra?: number;
   orcamentoMateriais?: number;
+  orcamentoTeto?: number;
+  reservaTecnica?: number;
   areaTotalM2: number;
   dataInicio: string;
   dataPrevisao: string;
@@ -202,3 +209,29 @@ export interface OCRResult {
   confianca?: number;
   isFallback?: boolean;
 }
+
+export interface VersaoPlanta {
+  id: string;
+  plantaId: string;
+  revisao: string;
+  dataEmissao: string;
+  autorArquiteto?: string;
+  aprovadorGestor?: string;
+  status: 'Vigente' | 'Em Revisão' | 'Superada';
+  arquivoPdfUrl?: string;
+  notasAlteracao?: string;
+  metadadosExtracao?: Record<string, any>;
+}
+
+export interface PlantaProjeto {
+  id: string;
+  projetoId: string;
+  codigoPrancha: string;
+  titulo: string;
+  disciplina: string;
+  arquivoUrl?: string;
+  revisaoVigente: string;
+  dataUltimaEmissao: string;
+  versoes: VersaoPlanta[];
+}
+

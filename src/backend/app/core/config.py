@@ -4,7 +4,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     PROJECT_NAME: str = "Sistema de Obras"
-    VERSION: str = "1.2.0"
+    VERSION: str = "2.0.0"
     API_V1_STR: str = "/api/v1"
     
     # Database

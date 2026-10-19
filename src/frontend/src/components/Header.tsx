@@ -12,7 +12,8 @@ import {
   Unlock,
   ChevronRight,
   HardHat,
-  RefreshCw
+  RefreshCw,
+  Store,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -25,6 +26,7 @@ interface HeaderProps {
   onOpenOfflineQueue: () => void;
   onOpenAddItem?: () => void;
   onOpenPrintBudget?: () => void;
+  onOpenPrintBalcao?: () => void;
   onExportCSV?: () => void;
   editModeEnabled?: boolean;
   onToggleEditMode?: (enabled: boolean) => void;
@@ -37,6 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewProject,
   onOpenAddItem,
   onOpenPrintBudget,
+  onOpenPrintBalcao,
   onExportCSV,
   editModeEnabled = true,
   onToggleEditMode,
@@ -151,11 +154,11 @@ export const Header: React.FC<HeaderProps> = ({
         {onExportCSV && (
           <button
             onClick={onExportCSV}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
             title="Exportar Planilha Orçamentária CSV"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-            <span className="hidden md:inline text-[11px]">CSV</span>
+            <span className="text-[11px]">CSV</span>
           </button>
         )}
 
@@ -166,18 +169,30 @@ export const Header: React.FC<HeaderProps> = ({
           title="Clique para recarregar a versão mais recente e limpar cache do navegador/PWA"
         >
           <RefreshCw className="w-3.5 h-3.5 text-amber-400" />
-          <span className="hidden lg:inline text-[11px] font-mono">v1.2.4</span>
+          <span className="hidden sm:inline text-[11px] font-mono">v2.2.0</span>
         </button>
 
         {/* Botão Imprimir PDF */}
         {onOpenPrintBudget && (
           <button
             onClick={onOpenPrintBudget}
-            className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
+            className="hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-slate-300 hover:text-white border border-slate-800 transition-colors"
             title="Imprimir Relatório ou Gerar PDF Executivo"
           >
             <Printer className="w-3.5 h-3.5 text-sky-400" />
-            <span className="hidden md:inline text-[11px]">PDF</span>
+            <span className="text-[11px]">PDF</span>
+          </button>
+        )}
+
+        {/* Botão Imprimir Lista de Balcão */}
+        {onOpenPrintBalcao && (
+          <button
+            onClick={onOpenPrintBalcao}
+            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-800 transition-colors"
+            title="Imprimir Lista Pautada A4 para Cotação de Balcão"
+          >
+            <Store className="w-3.5 h-3.5 text-amber-400" />
+            <span className="text-[11px]">Balcão A4</span>
           </button>
         )}
 
@@ -185,7 +200,7 @@ export const Header: React.FC<HeaderProps> = ({
         {onOpenAddItem && (
           <button
             onClick={onOpenAddItem}
-            className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-sm active:scale-95"
+            className="hidden sm:flex items-center gap-1.5 px-3 py-1 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs transition-all shadow-sm active:scale-95"
             title="Incluir Novo Insumo ou Composição"
           >
             <Plus className="w-3.5 h-3.5 stroke-[3]" />
