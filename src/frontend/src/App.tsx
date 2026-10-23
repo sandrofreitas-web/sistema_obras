@@ -121,7 +121,7 @@ export default function App() {
       }
 
       if (hasChanges) {
-        storageService.updateProject({ ...targetProj, compras });
+        storageService.saveProject({ ...targetProj, compras });
         setProjects(storageService.getProjects());
         setActiveProject(storageService.getActiveProject());
       }

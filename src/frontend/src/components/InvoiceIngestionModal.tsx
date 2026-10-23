@@ -38,6 +38,11 @@ export const InvoiceIngestionModal: React.FC<InvoiceIngestionModalProps> = ({
 }) => {
   if (!isOpen || !activeProject) return null;
 
+  const projectItemsWbs: ItemProjeto[] =
+    activeProject.cenarios?.find((c) => c.id === activeProject.cenarioAtivoId)?.itens ||
+    activeProject.cenarios?.[0]?.itens ||
+    [];
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Estados do fluxo
