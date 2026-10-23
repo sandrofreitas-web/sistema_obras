@@ -391,8 +391,12 @@ def reconcile_with_wbs(itens: List[Dict[str, Any]], projeto_id: Optional[str], d
         best_score = 0.0
 
         for it_plan in itens_planejados:
-            nome_plan = it_plan.material.nome if it_plan.material else ""
-            classe_plan = it_plan.material.classe if it_plan.material else ""
+            nome_plan = it_plan.material.descricao if it_plan.material else ""
+            classe_plan = (
+                it_plan.material.categoria.classe
+                if (it_plan.material and it_plan.material.categoria)
+                else ""
+            )
             tokens_plan = _normalize_tokens(f"{nome_plan} {classe_plan}")
 
             intersection = tokens_nf & tokens_plan
@@ -411,9 +415,9 @@ def reconcile_with_wbs(itens: List[Dict[str, Any]], projeto_id: Optional[str], d
 
         if best_match and best_score >= 0.35:
             item_nf["item_projeto_id_sugerido"] = best_match.id
-            item_nf["item_projeto_nome_sugerido"] = (
-                f"{best_match.material.nome} (Ambiente: {best_match.ambiente.nome if best_match.ambiente else 'Geral'})"
-            )
+            desc_mat = best_match.material.descricao if best_match.material else "Item"
+            amb_nome = best_match.ambiente.nome if best_match.ambiente else "Geral"
+            item_nf["item_projeto_nome_sugerido"] = f"{desc_mat} (Ambiente: {amb_nome})"
             item_nf["confianca_matching"] = round(min(best_score, 0.98), 2)
 
     return itens

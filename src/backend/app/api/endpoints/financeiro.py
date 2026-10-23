@@ -319,7 +319,7 @@ def confirmar_compra_ingestao(payload: ConfirmarIngestaoNFIn, db: Session = Depe
     itens_registrados_count = 0
     for it in payload.itens:
         # Procura ou associa material no catálogo
-        material = db.query(Material).filter(Material.nome.ilike(f"%{it.descricao[:30]}%")).first()
+        material = db.query(Material).filter(Material.descricao.ilike(f"%{it.descricao[:30]}%")).first()
         if not material:
             material = db.query(Material).first()
 
