@@ -48,6 +48,9 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
+    volumes:
+      - ./src/frontend:/app
+      - /app/node_modules
     ports:
       - "${FRONTEND_PORT:-3080}:5173"
     networks:

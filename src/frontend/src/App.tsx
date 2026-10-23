@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Material, Loja, Projeto, TaxonomiaClasse, ItemFilaOffline } from './types';
+import { Material, Loja, Projeto, TaxonomiaClasse, ItemFilaOffline, CompraReal } from './types';
 import { storageService } from './services/storageService';
+import { apiService } from './services/apiService';
 import { Sidebar } from './components/Sidebar';
 import { Header } from './components/Header';
 import { Navigation, TabType } from './components/Navigation';
@@ -74,6 +75,61 @@ export default function App() {
     }
   }, []);
 
+  const syncComprasFromBackend = async (projId: string) => {
+    try {
+      const apiCompras = await apiService.getCompras(projId);
+      if (!apiCompras || apiCompras.length === 0) return;
+
+      const projs = storageService.getProjects();
+      const targetProj = projs.find((p) => p.id === projId);
+      if (!targetProj) return;
+
+      let compras = targetProj.compras || [];
+      let hasChanges = false;
+
+      for (const ac of apiCompras) {
+        const exists = compras.some(
+          (c) => c.id === ac.id || (ac.numero_nf && c.numeroNotaFiscal === ac.numero_nf)
+        );
+        if (!exists) {
+          const formaPag: CompraReal['formaPagamento'] =
+            ac.forma_pagamento?.toLowerCase().includes('debito') ? 'cartao_debito' :
+            ac.forma_pagamento?.toLowerCase().includes('credito') ? 'cartao_credito' :
+            ac.forma_pagamento?.toLowerCase().includes('pix') ? 'pix' :
+            ac.forma_pagamento?.toLowerCase().includes('boleto') ? 'boleto' : 'dinheiro';
+
+          const nova: CompraReal = {
+            id: ac.id,
+            projetoId: ac.projeto_id,
+            descricao: `NF ${ac.numero_nf || 'S/N'} • ${ac.fornecedor_nome}`,
+            categoria: 'Hidráulica',
+            fornecedorLoja: ac.fornecedor_nome,
+            data: ac.data_compra,
+            quantidade: 1,
+            unidade: 'un',
+            valorUnitario: Number(ac.valor_total),
+            valorTotal: Number(ac.valor_total),
+            valorPlanejado: Number(ac.valor_total),
+            numeroNotaFiscal: ac.numero_nf || undefined,
+            formaPagamento: formaPag,
+            status: 'pago',
+            observacoes: ac.observacoes || '',
+          };
+          compras = [nova, ...compras];
+          hasChanges = true;
+        }
+      }
+
+      if (hasChanges) {
+        storageService.updateProject({ ...targetProj, compras });
+        setProjects(storageService.getProjects());
+        setActiveProject(storageService.getActiveProject());
+      }
+    } catch (err) {
+      console.warn('Sincronização em background de compras offline/API:', err);
+    }
+  };
+
   const loadAllData = () => {
     const mats = storageService.getMaterials();
     const tax = storageService.getTaxonomia();
@@ -88,12 +144,17 @@ export default function App() {
     setProjects(projs);
     setActiveProject(active);
     setOfflineQueue(queue);
+
+    if (active?.id) {
+      syncComprasFromBackend(active.id);
+    }
   };
 
   const handleSelectProject = (projectId: string) => {
     storageService.setActiveProjectId(projectId);
     const proj = projects.find((p) => p.id === projectId) || null;
     setActiveProject(proj);
+    syncComprasFromBackend(projectId);
   };
 
   const handleProjectUpdated = (updated: Projeto) => {
