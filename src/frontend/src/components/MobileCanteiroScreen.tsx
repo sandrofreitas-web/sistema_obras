@@ -32,14 +32,12 @@ interface MobileCanteiroScreenProps {
   project: Projeto | null;
   onProjectUpdated: (project: Projeto) => void;
   onNavigateTab: (tab: any) => void;
-  onOpenPrintBalcao?: () => void;
 }
 
 export const MobileCanteiroScreen: React.FC<MobileCanteiroScreenProps> = ({
   project,
   onProjectUpdated,
   onNavigateTab,
-  onOpenPrintBalcao,
 }) => {
   if (!project) {
     return (
@@ -547,15 +545,6 @@ export const MobileCanteiroScreen: React.FC<MobileCanteiroScreenProps> = ({
               Checklist de Materiais no Canteiro
             </h2>
           </div>
-          {onOpenPrintBalcao && (
-            <button
-              onClick={onOpenPrintBalcao}
-              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
-            >
-              <Store className="w-3 h-3" />
-              <span>Lista Balcão</span>
-            </button>
-          )}
         </div>
 
         <p className="text-[11px] text-slate-400">

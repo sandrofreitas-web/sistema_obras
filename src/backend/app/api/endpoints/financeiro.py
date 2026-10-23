@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, func
 from typing import List, Dict, Any, Optional
@@ -13,12 +13,17 @@ from app.models.entities import (
     ItemCompra,
     ServicoMaoObra,
     RegistroAuditoria,
+    ItemProjeto,
+    Material,
 )
 from app.api.schemas import (
     CompraIn,
     CompraOut,
     ParcelaOut,
+    IngestaoNotaFiscalResponse,
+    ConfirmarIngestaoNFIn,
 )
+from app.services.invoice_agent import process_invoice_file
 
 router = APIRouter()
 
@@ -211,7 +216,7 @@ def get_relatorio_executivo_financeiro(projeto_id: Optional[str] = None, db: Ses
             "total_comprometido": total_comprometido_geral,
             "saldo_orcamento": saldo_restante_orcamento,
             "percentual_consumido": round(percentual_orcamento_consumido, 1),
-            "status_orcamento": "DENTRO_DO_TETO" if saldo_restante_orcamento >= 0 else "ALERTA_ESTOURO",
+            "status_orcamento": "DENTRO_DO_TETO" if saldo_restante_orcamento >= 0 else "AJUSTE_ORCAMENTARIO",
         },
         "distribuicao_percentual": {
             "mao_de_obra_pct": round((total_mo_contratado / total_comprometido_geral) * 100, 1) if total_comprometido_geral > 0 else 0,
@@ -219,3 +224,137 @@ def get_relatorio_executivo_financeiro(projeto_id: Optional[str] = None, db: Ses
         },
         "total_compras_registradas": len(compras),
     }
+
+
+@router.post("/compras/ingest-nf", response_model=IngestaoNotaFiscalResponse)
+async def ingest_nota_fiscal(
+    file: UploadFile = File(...),
+    projeto_id: Optional[str] = Form(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Ingestão Agêntica de Nota Fiscal / Cupom Fiscal:
+    Recebe arquivo (PDF, Imagem JPG/PNG ou XML de NF-e), extrai cabeçalho e itens faturados
+    via visão computacional LLM Multimodal ou parser SEFAZ e sugere reconciliação com a WBS da obra.
+    """
+    try:
+        content = await file.read()
+        if not content:
+            raise HTTPException(status_code=400, detail="Arquivo vazio ou inválido.")
+
+        resultado = process_invoice_file(
+            file_bytes=content,
+            filename=file.filename or "nota_fiscal.pdf",
+            content_type=file.content_type or "application/octet-stream",
+            projeto_id=projeto_id,
+            db=db,
+        )
+        return resultado
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Falha na ingestão agêntica da Nota Fiscal: {str(e)}",
+        )
+
+
+@router.post("/compras/confirm-nf")
+def confirmar_compra_ingestao(payload: ConfirmarIngestaoNFIn, db: Session = Depends(get_db)):
+    """
+    Confirma e persiste a compra auditada a partir da extração da NF / Cupom,
+    associando os itens faturados aos itens da WBS do projeto e gerando parcelas.
+    """
+    # 1. Localiza ou cadastra fornecedor
+    forn = None
+    if payload.cnpj:
+        clean_cnpj = payload.cnpj.replace(".", "").replace("/", "").replace("-", "").strip()
+        forn = db.query(Fornecedor).filter(Fornecedor.cnpj.like(f"%{clean_cnpj}%")).first()
+
+    if not forn:
+        # Busca por nome aproximado
+        forn = db.query(Fornecedor).filter(Fornecedor.nome.ilike(f"%{payload.fornecedor_nome}%")).first()
+
+    if not forn:
+        # Cadastra fornecedor parceiro automaticamente
+        forn = Fornecedor(
+            nome=payload.fornecedor_nome,
+            cnpj=payload.cnpj,
+            categoria="Geral",
+        )
+        db.add(forn)
+        db.flush()
+
+    # 2. Cria registro mestre da Compra
+    nova_compra = Compra(
+        projeto_id=payload.projeto_id,
+        fornecedor_id=forn.id,
+        numero_nf=payload.numero_nf,
+        data_compra=payload.data_compra,
+        valor_total=payload.valor_total,
+        valor_frete=payload.valor_frete,
+        valor_desconto_geral=payload.valor_desconto_geral,
+        forma_pagamento=payload.forma_pagamento,
+        quantidade_parcelas=payload.quantidade_parcelas,
+        observacoes=payload.observacoes or "Ingerido via Agente Multimodal de Notas Fiscais",
+    )
+    db.add(nova_compra)
+    db.flush()
+
+    # 3. Gera parcelas de pagamento
+    num_parcelas = max(1, payload.quantidade_parcelas)
+    valor_parcela = round(payload.valor_total / num_parcelas, 2)
+    for i in range(1, num_parcelas + 1):
+        vencimento = payload.data_compra + timedelta(days=30 * i)
+        val = valor_parcela if i < num_parcelas else round(payload.valor_total - (valor_parcela * (num_parcelas - 1)), 2)
+        db.add(
+            ParcelaPagamento(
+                compra_id=nova_compra.id,
+                numero_parcela=i,
+                data_vencimento=vencimento,
+                valor_parcela=val,
+                status="Pendente",
+            )
+        )
+
+    # 4. Registra itens faturados e atualiza itens na WBS do projeto
+    itens_registrados_count = 0
+    for it in payload.itens:
+        # Procura ou associa material no catálogo
+        material = db.query(Material).filter(Material.nome.ilike(f"%{it.descricao[:30]}%")).first()
+        if not material:
+            material = db.query(Material).first()
+
+        item_compra = ItemCompra(
+            compra_id=nova_compra.id,
+            material_id=material.id if material else "mat-gen-01",
+            item_projeto_id=it.item_projeto_id_sugerido,
+            qtd_comprada=it.quantidade,
+            preco_unitario_real=it.valor_unitario,
+        )
+        db.add(item_compra)
+        itens_registrados_count += 1
+
+    # 5. Auditoria de suprimentos
+    db.add(
+        RegistroAuditoria(
+            usuario_nome="Gestor",
+            papel="gestor",
+            acao="ingestao_agente_nf",
+            entidade="compra",
+            entidade_id=nova_compra.id,
+            detalhes={
+                "nf": payload.numero_nf,
+                "valor_total": payload.valor_total,
+                "fornecedor": forn.nome,
+                "itens_count": itens_registrados_count,
+            },
+        )
+    )
+
+    db.commit()
+    return {
+        "status": "sucesso",
+        "mensagem": f"NF {payload.numero_nf or ''} de R$ {payload.valor_total:.2f} lançada com sucesso!",
+        "compra_id": nova_compra.id,
+        "itens_processados": itens_registrados_count,
+    }
+

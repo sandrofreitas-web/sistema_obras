@@ -135,6 +135,44 @@ export interface CompraReal {
   formaPagamento: 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia' | 'dinheiro';
   status: 'pago' | 'agendado' | 'pendente';
   observacoes?: string;
+  chaveAcesso?: string;
+  valorFrete?: number;
+  valorDesconto?: number;
+  itensFaturados?: ItemNotaFiscalExtraido[];
+}
+
+export interface ItemNotaFiscalExtraido {
+  id?: string;
+  descricao: string;
+  quantidade: number;
+  unidade: string;
+  valorUnitario: number;
+  valorTotal: number;
+  codigoProduto?: string;
+  ncm?: string;
+  categoriaSugerida?: string;
+  itemProjetoIdSugerido?: string;
+  itemProjetoNomeSugerido?: string;
+  confiancaMatching?: number;
+}
+
+export interface NotaFiscalExtraida {
+  sucesso: boolean;
+  metodoExtracao: 'xml_sefaz' | 'ia_multimodal' | 'fallback';
+  fornecedorNome: string;
+  cnpj?: string;
+  numeroNf?: string;
+  serie?: string;
+  chaveAcesso?: string;
+  dataCompra: string; // YYYY-MM-DD
+  valorTotal: number;
+  valorFrete?: number;
+  valorDesconto?: number;
+  formaPagamentoSugerida: 'pix' | 'cartao_credito' | 'cartao_debito' | 'boleto' | 'transferencia' | 'dinheiro';
+  itens: ItemNotaFiscalExtraido[];
+  confiancaGeral: number;
+  observacoes?: string;
+  arquivoNome?: string;
 }
 
 export interface FotoDiario {

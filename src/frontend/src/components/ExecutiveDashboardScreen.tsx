@@ -23,14 +23,12 @@ import { Projeto, CompraReal } from '../types';
 interface ExecutiveDashboardScreenProps {
   project: Projeto | null;
   onOpenPrintBudget: () => void;
-  onOpenPrintBalcao: () => void;
   onNavigateTab: (tabId: any) => void;
 }
 
 export const ExecutiveDashboardScreen: React.FC<ExecutiveDashboardScreenProps> = ({
   project,
   onOpenPrintBudget,
-  onOpenPrintBalcao,
   onNavigateTab,
 }) => {
   const [viewMode, setViewMode] = useState<'gerencial' | 'cliente'>('gerencial');
@@ -242,14 +240,6 @@ export const ExecutiveDashboardScreen: React.FC<ExecutiveDashboardScreenProps> =
               Visão do Cliente
             </button>
           </div>
-
-          <button
-            onClick={onOpenPrintBalcao}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-400/10 hover:bg-amber-400/20 text-amber-300 text-xs sm:text-sm font-bold border border-amber-400/30 shadow-sm transition-all active:scale-95"
-          >
-            <Printer className="w-4 h-4 text-amber-400" />
-            <span>Lista de Balcão A4</span>
-          </button>
 
           <button
             onClick={() => setIsClientReportModalOpen(true)}

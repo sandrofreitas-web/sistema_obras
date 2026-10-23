@@ -182,6 +182,55 @@ class CompraOut(BaseModel):
     parcelas: List[ParcelaOut] = []
 
 
+class ItemNotaFiscalExtraido(BaseModel):
+    id: Optional[str] = None
+    descricao: str
+    quantidade: float = 1.0
+    unidade: str = "un"
+    valor_unitario: float = 0.0
+    valor_total: float = 0.0
+    codigo_produto: Optional[str] = None
+    ncm: Optional[str] = None
+    categoria_sugerida: Optional[str] = "Materiais"
+    item_projeto_id_sugerido: Optional[str] = None
+    item_projeto_nome_sugerido: Optional[str] = None
+    confianca_matching: Optional[float] = 0.0
+
+
+class IngestaoNotaFiscalResponse(BaseModel):
+    sucesso: bool = True
+    metodo_extracao: str = "ia_multimodal"  # "xml_sefaz" | "ia_multimodal" | "fallback"
+    fornecedor_nome: str
+    cnpj: Optional[str] = None
+    numero_nf: Optional[str] = None
+    serie: Optional[str] = None
+    chave_acesso: Optional[str] = None
+    data_compra: str  # YYYY-MM-DD
+    valor_total: float
+    valor_frete: float = 0.0
+    valor_desconto: float = 0.0
+    forma_pagamento_sugerida: str = "cartao_credito"
+    itens: List[ItemNotaFiscalExtraido] = []
+    confianca_geral: float = 0.95
+    observacoes: Optional[str] = None
+    arquivo_nome: Optional[str] = None
+
+
+class ConfirmarIngestaoNFIn(BaseModel):
+    projeto_id: str
+    fornecedor_nome: str
+    cnpj: Optional[str] = None
+    numero_nf: Optional[str] = None
+    data_compra: date = Field(default_factory=date.today)
+    valor_total: float
+    valor_frete: float = 0.0
+    valor_desconto_geral: float = 0.0
+    forma_pagamento: str = "Cartao Credito"
+    quantidade_parcelas: int = 1
+    observacoes: Optional[str] = None
+    itens: List[ItemNotaFiscalExtraido] = []
+
+
 # ============================================================================
 # REQUISIÇÕES DE CAMPO (N8N / WHATSAPP / MENSAGENS)
 # ============================================================================

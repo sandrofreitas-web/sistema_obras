@@ -21,14 +21,12 @@ import { Loja, Projeto } from '../types';
 interface SuppliersScreenProps {
   lojas: Loja[];
   project: Projeto | null;
-  onOpenPrintBalcao: (lojaNome?: string) => void;
   onNavigateTab: (tabId: any) => void;
 }
 
 export const SuppliersScreen: React.FC<SuppliersScreenProps> = ({
   lojas,
   project,
-  onOpenPrintBalcao,
   onNavigateTab,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -219,17 +217,9 @@ export const SuppliersScreen: React.FC<SuppliersScreenProps> = ({
             <span>Lojas & Fornecedores Homologados</span>
           </h1>
           <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
-            Rede de parceiros comerciais com histórico consolidado de compras (2024 e 2026) e emissão de listas de balcão.
+            Rede de parceiros comerciais homologados com histórico consolidado de compras reais da obra.
           </p>
         </div>
-
-        <button
-          onClick={() => onOpenPrintBalcao()}
-          className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs sm:text-sm shadow-md shadow-amber-400/15 active:scale-95 transition-all whitespace-nowrap self-start md:self-auto"
-        >
-          <Printer className="w-4 h-4" />
-          <span>Imprimir Lista de Balcão (A4)</span>
-        </button>
       </div>
 
       {/* KPI Cards de Suprimentos */}
@@ -392,15 +382,6 @@ export const SuppliersScreen: React.FC<SuppliersScreenProps> = ({
                   className="px-3 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold border border-slate-700 transition-colors"
                 >
                   Ver Insumos
-                </button>
-
-                <button
-                  onClick={() => onOpenPrintBalcao(forn.nome)}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-400/10 hover:bg-amber-400 text-amber-300 hover:text-slate-950 border border-amber-400/30 hover:border-amber-400 text-xs font-bold transition-all"
-                  title="Emitir Lista de Cotação de Balcão para esta Loja"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>Lista Balcão</span>
                 </button>
               </div>
             </div>

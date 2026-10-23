@@ -49,9 +49,10 @@ A base de lojas do app já nasce pré-populada com os parceiros históricos da i
 | **Fase 1 — Backend & Dados** | Schema PostgreSQL (Plantas, Versões, Compras Reais, RBAC) + Sub-roteadores modulares FastAPI | Ingestão das 8 faturas reais (R$ 19.932,96) e consolidação dos 3 projetos no PostgreSQL 16 | **Concluído** ✅ |
 | **Fase 2 — Agente & CLI** | CLI `obras` (`status`, `print-lista`, `dimensionar`) + Skill `obras-gestor` para Antigravity IDE | Operação no terminal pelo gestor + regras de perda (+10%) e embalagem | **Concluído** ✅ |
 | **Fase 3 — Operação Arquiteto** | Estratificação tripla (Chat sem atrito, IDE com Slash Commands, CLI) + Regras RBAC | Colaboração com arquitetos parceiros e envio de pranchas R00/R01 | **Concluído** ✅ |
-| **Fase 4 — Web Cockpit & DBeaver**| Dashboard Gerencial com Curva S, Tracker de Faturas Reais, Módulo de Plantas, Impressão Balcão A4 e DBeaver | Gestão de Diretoria, prestação de contas, cotação de balcão e auditoria SQL direta desktop | **Concluído** ✅ |
+| **Fase 4 — Web Cockpit & DBeaver**| Dashboard Gerencial com Curva S, Tracker de Faturas Reais, Módulo de Plantas e DBeaver | Gestão de Diretoria, prestação de contas e auditoria SQL direta desktop | **Concluído** ✅ |
 | **Fase 5 — Mobile PWA Macro v2.2**| Design System Dark `#0b0f19`, Sidebar categorizada, Lightbox de canteiro, tabular-nums | Acompanhamento do canteiro sem atrito para o gestor em campo | **Concluído** ✅ |
-| **Fase 6 — Automação N8N & WhatsApp** | Workflow N8N para grupo da obra (áudio pedreiro Wagner → IA → Requisições) | Última fase de integração com WhatsApp | **Pendente / Próximo** ⏳ |
+| **Fase 6 — Ingestão Agêntica de NFs (IA Multimodal)** | Pipeline Híbrido: Fast-path XML SEFAZ + Gemini Vision para Cupons Térmicos (NFC-e/SAT) + Reconciliador WBS | Automação total de lançamento fiscal em Compras & Notas Fiscais, sem digitação manual | **Concluído** ✅ |
+| **Fase 7 — Automação N8N & WhatsApp** | Workflow N8N para grupo da obra (áudio pedreiro Wagner → IA → Requisições) | Integração com WhatsApp | **Pendente / Próximo** ⏳ |
 
 
 ---

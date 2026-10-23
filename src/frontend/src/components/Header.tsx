@@ -13,7 +13,6 @@ import {
   ChevronRight,
   HardHat,
   RefreshCw,
-  Store,
 } from 'lucide-react';
 
 interface HeaderProps {
@@ -26,7 +25,6 @@ interface HeaderProps {
   onOpenOfflineQueue: () => void;
   onOpenAddItem?: () => void;
   onOpenPrintBudget?: () => void;
-  onOpenPrintBalcao?: () => void;
   onExportCSV?: () => void;
   editModeEnabled?: boolean;
   onToggleEditMode?: (enabled: boolean) => void;
@@ -39,7 +37,6 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenNewProject,
   onOpenAddItem,
   onOpenPrintBudget,
-  onOpenPrintBalcao,
   onExportCSV,
   editModeEnabled = true,
   onToggleEditMode,
@@ -181,18 +178,6 @@ export const Header: React.FC<HeaderProps> = ({
           >
             <Printer className="w-3.5 h-3.5 text-sky-400" />
             <span className="text-[11px]">PDF</span>
-          </button>
-        )}
-
-        {/* Botão Imprimir Lista de Balcão */}
-        {onOpenPrintBalcao && (
-          <button
-            onClick={onOpenPrintBalcao}
-            className="hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-slate-900 hover:bg-slate-800 text-amber-300 hover:text-amber-200 border border-slate-800 transition-colors"
-            title="Imprimir Lista Pautada A4 para Cotação de Balcão"
-          >
-            <Store className="w-3.5 h-3.5 text-amber-400" />
-            <span className="text-[11px]">Balcão A4</span>
           </button>
         )}
 

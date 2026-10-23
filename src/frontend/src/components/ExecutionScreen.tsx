@@ -3,7 +3,6 @@ import {
   TrendingUp,
   Receipt,
   Plus,
-  AlertTriangle,
   Calendar,
   Store,
   DollarSign,
@@ -11,12 +10,14 @@ import {
   CreditCard,
   Percent,
   CheckCircle2,
+  Sparkles,
 } from 'lucide-react';
 import { Projeto, CompraReal } from '../types';
 
 interface ExecutionScreenProps {
   project: Projeto | null;
   onOpenRegisterPurchase: () => void;
+  onOpenIngestNF: () => void;
   onProjectUpdated: (project: Projeto) => void;
 }
 
@@ -40,6 +41,7 @@ const formatNumberBR = (val: number): string => {
 export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
   project,
   onOpenRegisterPurchase,
+  onOpenIngestNF,
 }) => {
   if (!project) return null;
 
@@ -93,9 +95,6 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
     });
   }, [currentScenario, purchases]);
 
-  // Check budget overrun alerts
-  const overruns = categoryComparison.filter((c) => c.isOverBudget);
-
   // Group purchases by date / month for disbursement trend
   const sortedPurchases = useMemo(() => {
     return [...purchases].sort((a, b) => new Date(b.data).getTime() - new Date(a.data).getTime());
@@ -119,40 +118,28 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
           </p>
         </div>
 
-        <button
-          onClick={onOpenRegisterPurchase}
-          className="px-3.5 py-2 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs shadow active:scale-95 transition-all flex items-center justify-center gap-1.5 flex-shrink-0"
-        >
-          <Plus className="w-3.5 h-3.5 stroke-[3]" />
-          <span>+ Registrar Compra / NF</span>
-        </button>
-      </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Botão de Ingestão Agêntica de NF / Cupom com IA */}
+          <button
+            onClick={onOpenIngestNF}
+            className="px-3.5 py-2 rounded-lg bg-gradient-to-r from-amber-400 to-amber-500 hover:from-amber-300 hover:to-amber-400 text-slate-950 font-black text-xs shadow-md shadow-amber-500/20 active:scale-95 transition-all flex items-center justify-center gap-1.5 flex-shrink-0"
+            title="Upload e extração automatizada de Nota Fiscal (PDF, foto de cupom térmico ou XML) via IA"
+          >
+            <Sparkles className="w-3.5 h-3.5 fill-slate-950" />
+            <span>+ Ingerir NF / Cupom (IA)</span>
+          </button>
 
-      {/* Alerta de Estouro Técnico */}
-      {overruns.length > 0 && (
-        <div className="bg-rose-950/30 border border-rose-800/60 rounded-xl p-3.5 space-y-1.5 text-xs">
-          <div className="flex items-center gap-2 text-rose-400 font-bold">
-            <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-            <span>Alerta de Estouro Orçamentário Detectado</span>
-          </div>
-          <p className="text-slate-300 text-[11px]">
-            As seguintes categorias ultrapassaram o montante originalmente orçado no cenário ativo:
-          </p>
-          <div className="flex flex-wrap gap-1.5 pt-0.5">
-            {overruns.map((o) => (
-              <span
-                key={o.categoria}
-                className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded bg-rose-900/40 border border-rose-700/80 text-rose-200 font-mono text-[11px]"
-              >
-                <span>{o.categoria}:</span>
-                <strong className="text-rose-100">
-                  +{formatCurrencyBR(o.deviance)} (+{o.deviancePercent.toFixed(1)}%)
-                </strong>
-              </span>
-            ))}
-          </div>
+          {/* Botão Registro Manual de Compra */}
+          <button
+            onClick={onOpenRegisterPurchase}
+            className="px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold text-xs shadow active:scale-95 transition-all flex items-center justify-center gap-1.5 flex-shrink-0"
+            title="Cadastrar compra avulsa ou despesa manualmente"
+          >
+            <Plus className="w-3.5 h-3.5 stroke-[3]" />
+            <span>+ Lançamento Manual</span>
+          </button>
         </div>
-      )}
+      </div>
 
       {/* Barra de Telemetria Financeira Consolidada (Menos cards, dados em linha) */}
       <div className="grid grid-cols-2 md:grid-cols-4 border border-slate-800 rounded-xl overflow-hidden divide-y md:divide-y-0 md:divide-x divide-slate-800/80 bg-slate-900 shadow-sm text-xs">
@@ -218,7 +205,7 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
             {formatCurrencyBR(Math.abs(balanceRemaining))}
           </div>
           <span className="text-[10px] text-slate-500 font-mono block">
-            {balanceRemaining >= 0 ? 'Dentro do teto previsto' : 'Estouro acumulado'}
+            {balanceRemaining >= 0 ? 'Dentro do teto previsto' : 'Variação a maior'}
           </span>
         </div>
       </div>
@@ -260,7 +247,7 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
                     </td>
                     <td
                       className={`py-2 px-3 text-right font-mono font-bold tabular-nums ${
-                        isUnder ? 'text-emerald-400' : 'text-rose-400'
+                        isUnder ? 'text-emerald-400' : 'text-amber-400'
                       }`}
                     >
                       {cat.deviance > 0 ? '+' : ''}
@@ -268,7 +255,7 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
                     </td>
                     <td
                       className={`py-2 px-3 text-right font-mono font-bold tabular-nums ${
-                        isUnder ? 'text-emerald-400' : 'text-rose-400'
+                        isUnder ? 'text-emerald-400' : 'text-amber-400'
                       }`}
                     >
                       {cat.deviancePercent > 0 ? '+' : ''}
@@ -282,8 +269,8 @@ export const ExecutionScreen: React.FC<ExecutionScreenProps> = ({
                           Economia
                         </span>
                       ) : (
-                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-rose-500/15 text-rose-400 border border-rose-500/30">
-                          Estouro
+                        <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">
+                          Excedente
                         </span>
                       )}
                     </td>

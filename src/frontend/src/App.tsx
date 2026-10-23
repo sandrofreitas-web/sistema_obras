@@ -16,7 +16,7 @@ import { OfflineQueueModal } from './components/OfflineQueueModal';
 import { PrintBudgetModal } from './components/PrintBudgetModal';
 import { ExecutiveDashboardScreen } from './components/ExecutiveDashboardScreen';
 import { BlueprintsScreen } from './components/BlueprintsScreen';
-import { PrintBalcaoModal } from './components/PrintBalcaoModal';
+import { InvoiceIngestionModal } from './components/InvoiceIngestionModal';
 import { ProjectsScreen } from './components/ProjectsScreen';
 import { SuppliersScreen } from './components/SuppliersScreen';
 import { NewProjectModal } from './components/NewProjectModal';
@@ -48,9 +48,9 @@ export default function App() {
   const [materialForAddToProject, setMaterialForAddToProject] = useState<Material | null>(null);
   const [isAddToProjectModalOpen, setIsAddToProjectModalOpen] = useState(false);
   const [isRegisterPurchaseModalOpen, setIsRegisterPurchaseModalOpen] = useState(false);
+  const [isInvoiceIngestionModalOpen, setIsInvoiceIngestionModalOpen] = useState(false);
   const [isOfflineQueueModalOpen, setIsOfflineQueueModalOpen] = useState(false);
   const [isPrintBudgetModalOpen, setIsPrintBudgetModalOpen] = useState(false);
-  const [isPrintBalcaoModalOpen, setIsPrintBalcaoModalOpen] = useState(false);
   const [isNewProjectModalOpen, setIsNewProjectModalOpen] = useState(false);
 
 
@@ -145,7 +145,6 @@ export default function App() {
           offlineQueue={offlineQueue}
           onOpenOfflineQueue={() => setIsOfflineQueueModalOpen(true)}
           onOpenPrintBudget={() => setIsPrintBudgetModalOpen(true)}
-          onOpenPrintBalcao={() => setIsPrintBalcaoModalOpen(true)}
           editModeEnabled={editModeEnabled}
           onToggleEditMode={setEditModeEnabled}
         />
@@ -158,7 +157,6 @@ export default function App() {
                 project={activeProject}
                 onProjectUpdated={handleProjectUpdated}
                 onNavigateTab={(tab) => setCurrentTab(tab)}
-                onOpenPrintBalcao={() => setIsPrintBalcaoModalOpen(true)}
               />
             </div>
           )}
@@ -168,7 +166,6 @@ export default function App() {
               <ExecutiveDashboardScreen
                 project={activeProject}
                 onOpenPrintBudget={() => setIsPrintBudgetModalOpen(true)}
-                onOpenPrintBalcao={() => setIsPrintBalcaoModalOpen(true)}
                 onNavigateTab={(tab) => setCurrentTab(tab)}
               />
             </div>
@@ -216,6 +213,7 @@ export default function App() {
               <ExecutionScreen
                 project={activeProject}
                 onOpenRegisterPurchase={() => setIsRegisterPurchaseModalOpen(true)}
+                onOpenIngestNF={() => setIsInvoiceIngestionModalOpen(true)}
                 onProjectUpdated={handleProjectUpdated}
               />
             </div>
@@ -247,7 +245,6 @@ export default function App() {
               <SuppliersScreen
                 lojas={lojas}
                 project={activeProject}
-                onOpenPrintBalcao={(lojaNome) => setIsPrintBalcaoModalOpen(true)}
                 onNavigateTab={(tab) => setCurrentTab(tab)}
               />
             </div>
@@ -322,11 +319,12 @@ export default function App() {
         project={activeProject}
       />
 
-      {/* Print / Export Balcao Shopping List Modal */}
-      <PrintBalcaoModal
-        isOpen={isPrintBalcaoModalOpen}
-        onClose={() => setIsPrintBalcaoModalOpen(false)}
-        project={activeProject}
+      {/* Ingestão Agêntica de NF / Cupom Fiscal com IA */}
+      <InvoiceIngestionModal
+        isOpen={isInvoiceIngestionModalOpen}
+        onClose={() => setIsInvoiceIngestionModalOpen(false)}
+        activeProject={activeProject}
+        onProjectUpdated={handleProjectUpdated}
       />
 
       {/* New Project Creation Modal */}
