@@ -21,7 +21,7 @@ import httpx
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
-from app.models.entities import Projeto, ItemProjeto, Material, Fornecedor
+from app.models.entities import Projeto, Cenario, ItemProjeto, Material, Fornecedor
 from app.api.schemas import IngestaoNotaFiscalResponse, ItemNotaFiscalExtraido
 
 logger = logging.getLogger("invoice_agent")
@@ -220,7 +220,13 @@ def parse_invoice_multimodal(file_bytes: bytes, mime_type: str, filename: str) -
         "}"
     )
 
-    models_to_try = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    models_to_try = [
+        "gemini-3.8-flash",
+        "gemini-3.7-flash",
+        "gemini-flash-latest",
+        "gemini-3.5-flash",
+        "gemini-2.5-flash-lite",
+    ]
     last_error = None
 
     for model_name in models_to_try:
@@ -357,10 +363,17 @@ def reconcile_with_wbs(itens: List[Dict[str, Any]], projeto_id: Optional[str], d
     if not projeto_id:
         return itens
 
-    # Busca os itens do projeto
-    itens_planejados = db.query(ItemProjeto).filter_by(projeto_id=projeto_id).all()
+    # Busca os itens do projeto via Cenario
+    itens_planejados = []
+    if projeto_id:
+        itens_planejados = (
+            db.query(ItemProjeto)
+            .join(Cenario, ItemProjeto.cenario_id == Cenario.id)
+            .filter(Cenario.projeto_id == projeto_id)
+            .all()
+        )
     if not itens_planejados:
-        return itens
+        itens_planejados = db.query(ItemProjeto).all()
 
     def _normalize_tokens(text: str) -> set:
         clean = re.sub(r"[^a-zA-Z0-9\s]", " ", text.lower())

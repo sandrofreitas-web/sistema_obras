@@ -167,47 +167,55 @@ export const InvoiceIngestionModal: React.FC<InvoiceIngestionModalProps> = ({
         }
       }
 
-      if (response && response.ok) {
-        setProcessingStatus('Reconciliando itens com a WBS e EAP da obra...');
-        const data = await response.json();
-        setExtractedData({
-          sucesso: data.sucesso,
-          metodoExtracao: data.metodo_extracao,
-          fornecedorNome: data.fornecedor_nome || 'Fornecedor Local',
-          cnpj: data.cnpj || '',
-          numeroNf: data.numero_nf || '',
-          serie: data.serie || '',
-          chaveAcesso: data.chave_acesso || '',
-          dataCompra: data.data_compra || new Date().toISOString().split('T')[0],
-          valorTotal: data.valor_total || 0,
-          valorFrete: data.valor_frete || 0,
-          valorDesconto: data.valor_desconto || 0,
-          formaPagamentoSugerida: data.forma_pagamento_sugerida || 'cartao_credito',
-          itens: (data.itens || []).map((it: any, idx: number) => ({
-            id: it.id || `item-${idx + 1}`,
-            descricao: it.descricao || 'Item Faturado',
-            quantidade: it.quantidade || 1,
-            unidade: it.unidade || 'un',
-            valorUnitario: it.valor_unitario || 0,
-            valorTotal: it.valor_total || 0,
-            codigoProduto: it.codigo_produto,
-            ncm: it.ncm,
-            categoriaSugerida: it.categoria_sugerida || 'Materiais',
-            itemProjetoIdSugerido: it.item_projeto_id_sugerido || '',
-            itemProjetoNomeSugerido: it.item_projeto_nome_sugerido || '',
-            confiancaMatching: it.confianca_matching || 0,
-          })),
-          confiancaGeral: data.confianca_geral || 0.95,
-          observacoes: data.observacoes || '',
-          arquivoNome: file.name,
-        });
-        setStep('review');
-        return;
+      if (response) {
+        if (response.ok) {
+          setProcessingStatus('Reconciliando itens com a WBS e EAP da obra...');
+          const data = await response.json();
+          setExtractedData({
+            sucesso: data.sucesso,
+            metodoExtracao: data.metodo_extracao,
+            fornecedorNome: data.fornecedor_nome || 'Fornecedor Local',
+            cnpj: data.cnpj || '',
+            numeroNf: data.numero_nf || '',
+            serie: data.serie || '',
+            chaveAcesso: data.chave_acesso || '',
+            dataCompra: data.data_compra || new Date().toISOString().split('T')[0],
+            valorTotal: data.valor_total || 0,
+            valorFrete: data.valor_frete || 0,
+            valorDesconto: data.valor_desconto || 0,
+            formaPagamentoSugerida: data.forma_pagamento_sugerida || 'cartao_credito',
+            itens: (data.itens || []).map((it: any, idx: number) => ({
+              id: it.id || `item-${idx + 1}`,
+              descricao: it.descricao || 'Item Faturado',
+              quantidade: it.quantidade || 1,
+              unidade: it.unidade || 'un',
+              valorUnitario: it.valor_unitario || 0,
+              valorTotal: it.valor_total || 0,
+              codigoProduto: it.codigo_produto,
+              ncm: it.ncm,
+              categoriaSugerida: it.categoria_sugerida || 'Materiais',
+              itemProjetoIdSugerido: it.item_projeto_id_sugerido || '',
+              itemProjetoNomeSugerido: it.item_projeto_nome_sugerido || '',
+              confiancaMatching: it.confianca_matching || 0,
+            })),
+            confiancaGeral: data.confianca_geral || 0.95,
+            observacoes: data.observacoes || '',
+            arquivoNome: file.name,
+          });
+          setStep('review');
+          return;
+        } else {
+          let errorDetail = `Erro HTTP ${response.status}`;
+          try {
+            const errJson = await response.json();
+            if (errJson.detail) errorDetail = errJson.detail;
+          } catch {}
+          throw new Error(errorDetail);
+        }
       }
 
-      // Se o backend não estiver respondendo, usa o motor local client-side inteligente
-      setProcessingStatus('Concluindo extração inteligente em contingência local...');
-      const fallbackResult = simulateClientSideExtraction(file, plannedItems);
+      // Se não houver servidor acessível
+      throw new Error('Servidor backend indisponível para processamento da Nota Fiscal.');
       setExtractedData(fallbackResult);
       setStep('review');
     } catch (err: any) {
