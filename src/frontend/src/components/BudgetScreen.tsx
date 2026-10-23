@@ -111,8 +111,20 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroupFilter, setSelectedGroupFilter] = useState<string>('todos');
   const [selectedAmbienteFilter, setSelectedAmbienteFilter] = useState<string>('todos');
+  const [selectedLojaFilter, setSelectedLojaFilter] = useState<string>('todas');
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<'todos' | 'planejado' | 'comprado'>('todos');
   const [groupingMode, setGroupingMode] = useState<'etapas' | 'ambientes'>('etapas');
+
+  // Lojas / Fornecedores disponíveis nos itens deste orçamento
+  const availableLojas = useMemo(() => {
+    const set = new Set<string>();
+    items.forEach((it) => {
+      if (it.lojaReferencia && it.lojaReferencia.trim()) {
+        set.add(it.lojaReferencia.trim());
+      }
+    });
+    return Array.from(set).sort();
+  }, [items]);
 
   // Accordion Expanded State
   const [expandedSections, setExpandedSections] = useState<Record<string, boolean>>({});
@@ -161,10 +173,11 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         const matchesFab = (item.fabricante || '').toLowerCase().includes(q);
         const matchesCat = item.categoria.toLowerCase().includes(q);
         const matchesTipo = (item.tipo || '').toLowerCase().includes(q);
+        const matchesLoja = (item.lojaReferencia || '').toLowerCase().includes(q);
         const roomName = project.ambientes.find((a) => a.id === item.ambienteId)?.nome || '';
         const matchesRoom = roomName.toLowerCase().includes(q);
 
-        if (!matchesName && !matchesFab && !matchesCat && !matchesTipo && !matchesRoom) {
+        if (!matchesName && !matchesFab && !matchesCat && !matchesTipo && !matchesRoom && !matchesLoja) {
           return false;
         }
       }
@@ -177,12 +190,16 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         return false;
       }
 
+      if (selectedLojaFilter !== 'todas' && item.lojaReferencia !== selectedLojaFilter) {
+        return false;
+      }
+
       if (selectedStatusFilter === 'comprado' && !item.comprado) return false;
       if (selectedStatusFilter === 'planejado' && item.comprado) return false;
 
       return true;
     });
-  }, [items, searchTerm, selectedGroupFilter, selectedAmbienteFilter, selectedStatusFilter, project.ambientes]);
+  }, [items, searchTerm, selectedGroupFilter, selectedAmbienteFilter, selectedLojaFilter, selectedStatusFilter, project.ambientes]);
 
   // Estrutura Analítica WBS (Nível 1: Macro-Etapas / Classes)
   const wbsEtapasData = useMemo(() => {
@@ -570,75 +587,111 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
             )}
           </button>
         </div>
-
-        {/* Seletor de Fase Sequencial da Obra */}
-        {projects && projects.length > 1 && onSelectProject && (
-          <div className="hidden md:flex items-center gap-1.5 text-xs">
-            <span className="text-[10px] font-mono uppercase text-slate-400 font-bold">Fase da Obra:</span>
-            {projects.map((p, idx) => {
-              const isActive = p.id === project.id;
-              return (
-                <button
-                  key={p.id}
-                  onClick={() => onSelectProject(p.id)}
-                  className={`px-2.5 py-0.5 rounded-md text-[11px] font-bold transition-colors ${
-                    isActive
-                      ? 'bg-amber-400 text-slate-950 font-black shadow-sm'
-                      : 'bg-slate-900 text-slate-400 hover:text-white border border-slate-800'
-                  }`}
-                >
-                  {idx + 1}ª Fase ({p.id.includes('pastoral') ? 'Casa Pastoral' : 'Banheiro Masculino'})
-                </button>
-              );
-            })}
-          </div>
-        )}
       </div>
 
       {/* 2. Barra de Filtros & Controle de Visualização da Grade (38px Compacta) */}
       <div className="h-10 bg-[#080c14] border-b border-slate-800/80 px-4 flex items-center justify-between gap-3 flex-shrink-0 text-xs">
         {/* Esquerda: Busca rápida e filtros */}
-        <div className="flex items-center gap-2 flex-1 max-w-2xl min-w-0">
-          <div className="relative w-48 sm:w-64">
+        <div className="flex items-center gap-2 flex-1 max-w-3xl min-w-0">
+          {/* Campo de Busca com botão limpar X */}
+          <div className="relative w-48 sm:w-64 flex-shrink-0">
             <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
             <input
               type="text"
-              placeholder="Buscar insumo, fabricante ou código..."
+              placeholder="Buscar insumo, fabricante, loja..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full bg-[#0d121e] border border-slate-800 rounded-lg pl-8 pr-2.5 py-1 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500"
+              className="w-full bg-[#0d121e] border border-slate-800 rounded-lg pl-8 pr-7 py-1 text-xs text-white placeholder-slate-500 outline-none focus:border-sky-500"
             />
+            {searchTerm && (
+              <button
+                type="button"
+                onClick={() => setSearchTerm('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-0.5 rounded transition-colors"
+                title="Limpar filtro de busca"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
           </div>
 
-          {/* Toggle de Agrupamento WBS: Por Etapa vs Por Ambiente */}
-          <div className="flex items-center bg-[#0d121e] border border-slate-800 rounded-lg p-0.5">
-            <button
-              onClick={() => setGroupingMode('etapas')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
-                groupingMode === 'etapas'
-                  ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                  : 'text-slate-400 hover:text-white'
+          {/* Filtro por Fornecedor / Loja de Cotação */}
+          <div className="flex items-center gap-1 flex-shrink-0">
+            <select
+              value={selectedLojaFilter}
+              onChange={(e) => setSelectedLojaFilter(e.target.value)}
+              className={`bg-[#0d121e] border rounded-lg px-2 py-1 text-[11px] outline-none cursor-pointer max-w-[160px] truncate transition-colors ${
+                selectedLojaFilter !== 'todas'
+                  ? 'border-amber-500/60 text-amber-300 font-semibold bg-amber-950/20'
+                  : 'border-slate-800 text-slate-300'
               }`}
+              title="Filtrar por Fornecedor / Loja de Cotação"
             >
-              Por Macro-Etapas
-            </button>
-            <button
-              onClick={() => setGroupingMode('ambientes')}
-              className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
-                groupingMode === 'ambientes'
-                  ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Por Ambientes
-            </button>
+              <option value="todas">Fornecedor: Todos</option>
+              {availableLojas.map((lj) => (
+                <option key={lj} value={lj}>
+                  {lj}
+                </option>
+              ))}
+            </select>
+            {selectedLojaFilter !== 'todas' && (
+              <button
+                type="button"
+                onClick={() => setSelectedLojaFilter('todas')}
+                className="text-slate-400 hover:text-amber-400 p-0.5 rounded transition-colors"
+                title="Limpar filtro de fornecedor"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            )}
           </div>
+
+          {/* Controles específicos da subTab */}
+          {subTab === 'wbs' && (
+            /* Toggle de Agrupamento WBS: Por Etapa vs Por Ambiente */
+            <div className="flex items-center bg-[#0d121e] border border-slate-800 rounded-lg p-0.5 flex-shrink-0">
+              <button
+                onClick={() => setGroupingMode('etapas')}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
+                  groupingMode === 'etapas'
+                    ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Por Macro-Etapas
+              </button>
+              <button
+                onClick={() => setGroupingMode('ambientes')}
+                className={`px-2.5 py-1 rounded text-[11px] font-bold transition-colors ${
+                  groupingMode === 'ambientes'
+                    ? 'bg-sky-500/20 text-sky-400 border border-sky-500/30'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Por Ambientes
+              </button>
+            </div>
+          )}
+
+          {subTab === 'compras' && (
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-300 font-semibold">
+              <ListChecks className="w-3.5 h-3.5" />
+              <span>Visão Contínua de Cotação • Todos os Itens da Obra (Sem Etapas/Ambientes)</span>
+            </div>
+          )}
+
+          {subTab === 'proposta' && (
+            <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-sky-500/10 border border-sky-500/20 text-[11px] text-sky-300 font-semibold">
+              <TrendingUp className="w-3.5 h-3.5" />
+              <span>Visão Comercial Sintética • Resumo Executivo Consolidado</span>
+            </div>
+          )}
 
           {/* Filtro Status */}
           <select
             value={selectedStatusFilter}
             onChange={(e) => setSelectedStatusFilter(e.target.value as any)}
-            className="bg-[#0d121e] border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300 outline-none cursor-pointer"
+            className="bg-[#0d121e] border border-slate-800 rounded-lg px-2 py-1 text-[11px] text-slate-300 outline-none cursor-pointer flex-shrink-0"
           >
             <option value="todos">Status: Todos</option>
             <option value="planejado">Apenas Planejados</option>
@@ -680,13 +733,295 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
         </div>
       </div>
 
-      {/* 3. Área Central: Grade WBS Hierárquica em Árvore (Full Width) + Painel Inspetor Lateral */}
+      {/* 3. Área Central: Renderização Condicional da Sub-Aba Ativa */}
       <div className="flex-1 flex min-h-0 relative overflow-hidden pb-14">
-        {/* TABELA WBS 100% LARGURA */}
-        <div className="flex-1 overflow-y-auto overflow-x-auto">
-          <table className="w-full text-left border-collapse min-w-[1050px]">
-            {/* Header Corporativo (Inspirado no Sienge / Mais Controle) */}
-            <thead className="bg-[#0b101c] text-slate-300 border-b border-slate-800 text-[11px] font-mono uppercase tracking-wider sticky top-0 z-10 select-none shadow-sm">
+        {subTab === 'compras' ? (
+          /* =========================================================================
+             VISÃO 1: MAPA DE COTAÇÃO (Todos os Itens Contínuos Sem Etapas ou Ambientes)
+             ========================================================================= */
+          <div className="flex-1 overflow-y-auto overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[1050px]">
+              <thead className="bg-[#0b101c] text-slate-300 border-b border-slate-800 text-[11px] font-mono uppercase tracking-wider sticky top-0 z-10 select-none shadow-sm">
+                <tr>
+                  <th className="py-2.5 px-3 w-12 text-center">#</th>
+                  <th className="py-2.5 px-3">Insumo / Especificação do Material</th>
+                  <th className="py-2.5 px-3 w-32">Classe / Etapa</th>
+                  <th className="py-2.5 px-3 w-32">Ambiente</th>
+                  <th className="py-2.5 px-3 w-36">Fornecedor / Cotação</th>
+                  <th className="py-2.5 px-3 w-20 text-right">Qtde</th>
+                  <th className="py-2.5 px-3 w-14 text-center">Un.</th>
+                  <th className="py-2.5 px-3 w-28 text-right">Custo Unit.</th>
+                  <th className="py-2.5 px-3 w-32 text-right">Custo Total</th>
+                  <th className="py-2.5 px-3 w-28 text-center">Status</th>
+                  <th className="py-2.5 px-3 w-20 text-center">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-800/60 text-xs">
+                {filteredItems.length === 0 ? (
+                  <tr>
+                    <td colSpan={11} className="py-16 text-center text-slate-500">
+                      <p className="font-semibold text-sm">Nenhum item encontrado no Mapa de Cotação com os filtros atuais.</p>
+                      <p className="text-xs text-slate-600 mt-1">Experimente limpar a busca ou selecionar outro fornecedor.</p>
+                    </td>
+                  </tr>
+                ) : (
+                  filteredItems.map((item, idx) => {
+                    const isSelected = selectedInspectorItem?.id === item.id;
+                    const roomName = project.ambientes.find((a) => a.id === item.ambienteId)?.nome || 'Geral';
+                    return (
+                      <tr
+                        key={item.id}
+                        onClick={() => {
+                          setSelectedInspectorItem(item);
+                          setSelectedItemCode(String(idx + 1));
+                        }}
+                        className={`cursor-pointer transition-colors group ${
+                          isSelected
+                            ? 'bg-amber-500/15 border-y border-amber-500/40 text-white'
+                            : idx % 2 === 0
+                            ? 'bg-[#0a0f1d] hover:bg-[#121a2f] text-slate-300'
+                            : 'bg-[#080c18] hover:bg-[#121a2f] text-slate-300'
+                        }`}
+                      >
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400 font-bold group-hover:text-amber-400">
+                          {idx + 1}
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <div className="flex flex-col min-w-0">
+                            <span className="font-semibold text-slate-100 group-hover:text-amber-300 transition-colors">
+                              {item.materialNome}
+                            </span>
+                            <div className="flex items-center gap-2 text-[10px] text-slate-400 mt-0.5 font-mono">
+                              {item.fabricante && (
+                                <span className="text-amber-400/90 font-medium">Fab: {item.fabricante}</span>
+                              )}
+                              {item.categoria && <span>• {item.categoria}</span>}
+                              {item.observacoes && (
+                                <span className="text-slate-500 italic truncate max-w-[220px]">
+                                  ({item.observacoes})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-semibold bg-slate-800 text-slate-300 border border-slate-700/60 truncate max-w-[130px]">
+                            {item.classe || 'Geral'}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          <span className="inline-block px-2 py-0.5 rounded text-[10px] font-medium bg-slate-800/80 text-slate-300 truncate max-w-[130px]">
+                            {roomName}
+                          </span>
+                        </td>
+                        <td className="py-2.5 px-3">
+                          {item.lojaReferencia ? (
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-semibold bg-sky-950/40 text-sky-300 border border-sky-800/40 truncate max-w-[140px]">
+                              {item.lojaReferencia}
+                            </span>
+                          ) : (
+                            <span className="text-slate-500 text-[11px] italic">A definir</span>
+                          )}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-200">
+                          {formatNumberBR(item.quantidadeComPerda)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center font-mono text-slate-400 uppercase text-[11px]">
+                          {item.unidade}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono tabular-nums text-slate-300">
+                          R$ {formatNumberBR(item.precoUnitario)}
+                        </td>
+                        <td className="py-2.5 px-3 text-right font-mono font-bold tabular-nums text-emerald-400">
+                          R$ {formatNumberBR(item.precoTotal)}
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleItemComprado(item.id, Boolean(item.comprado));
+                            }}
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10px] font-bold transition-all ${
+                              item.comprado
+                                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 hover:bg-emerald-500/30'
+                                : 'bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25'
+                            }`}
+                            title="Clique para alternar o status de compra"
+                          >
+                            {item.comprado ? (
+                              <>
+                                <Check className="w-3 h-3" />
+                                <span>Comprado</span>
+                              </>
+                            ) : (
+                              <>
+                                <Clock className="w-3 h-3" />
+                                <span>A Cotar</span>
+                              </>
+                            )}
+                          </button>
+                        </td>
+                        <td className="py-2.5 px-3 text-center">
+                          <div className="flex items-center justify-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
+                            {editModeEnabled && (
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleOpenEditItem(item);
+                                  }}
+                                  className="p-1 rounded text-slate-400 hover:text-white hover:bg-slate-800"
+                                  title="Editar item"
+                                >
+                                  <Edit2 className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteItem(item.id);
+                                  }}
+                                  className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800"
+                                  title="Excluir item"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        ) : subTab === 'proposta' ? (
+          /* =========================================================================
+             VISÃO 2: PROPOSTA COMERCIAL (Visão Sintética Executiva por Macro-Etapa)
+             ========================================================================= */
+          <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6">
+            <div className="max-w-5xl mx-auto space-y-6">
+              <div className="bg-[#0b101d] border border-slate-800 rounded-xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div>
+                  <span className="text-[10px] font-mono uppercase tracking-wider text-sky-400 font-bold block">
+                    Documento de Venda & Orçamento Sintético
+                  </span>
+                  <h3 className="text-lg font-black text-white mt-0.5">
+                    Proposta Comercial • {project.nome}
+                  </h3>
+                  <p className="text-xs text-slate-400 mt-1">
+                    Consolidação executiva por macro-etapas para aprovação do cliente ou diretoria institucional.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={onOpenPrintBudget}
+                    className="flex items-center gap-2 px-3.5 py-2 rounded-lg bg-sky-500 hover:bg-sky-400 text-slate-950 font-black text-xs transition-colors shadow-md"
+                  >
+                    <Printer className="w-4 h-4" />
+                    <span>Imprimir Proposta A4</span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="bg-[#0b101d] border border-slate-800 rounded-xl overflow-hidden shadow-sm">
+                <table className="w-full text-left border-collapse">
+                  <thead className="bg-[#0e1424] text-slate-300 border-b border-slate-800 text-[11px] font-mono uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4 w-16 text-center">Item</th>
+                      <th className="py-3 px-4">Macro-Etapa Construtiva</th>
+                      <th className="py-3 px-4 w-28 text-center">Itens</th>
+                      <th className="py-3 px-4 w-32 text-right">Custo Direto</th>
+                      <th className="py-3 px-4 w-24 text-center">Part. %</th>
+                      <th className="py-3 px-4 w-24 text-center">BDI (%)</th>
+                      <th className="py-3 px-4 w-36 text-right">Preço Proposta</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-800/60 text-xs">
+                    {wbsEtapasData.map((etapa, idx) => {
+                      const code = `${idx + 1}.0`;
+                      const partPct = rawTotalActive > 0 ? (etapa.subtotal / rawTotalActive) * 100 : 0;
+                      const precoPropostaEtapa = etapa.subtotal * (1 + contingencyPercent / 100);
+                      return (
+                        <tr key={etapa.id} className="hover:bg-slate-800/30 transition-colors">
+                          <td className="py-3 px-4 text-center font-mono font-bold text-sky-400">
+                            {code}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-white text-sm">
+                            {etapa.nome}
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono text-slate-400">
+                            {etapa.itens.length} {etapa.itens.length === 1 ? 'item' : 'itens'}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono tabular-nums text-slate-300">
+                            R$ {formatNumberBR(etapa.subtotal)}
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono text-slate-400 tabular-nums">
+                            {partPct.toFixed(1)}%
+                          </td>
+                          <td className="py-3 px-4 text-center font-mono text-amber-400 tabular-nums">
+                            {contingencyPercent.toFixed(1)}%
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-extrabold tabular-nums text-sky-400 text-sm">
+                            R$ {formatNumberBR(precoPropostaEtapa)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-[#0b101d] border border-slate-800 rounded-xl p-4">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">1. Materiais Diretos</span>
+                  <div className="text-lg font-black text-white font-mono mt-1">
+                    {formatCurrencyBR(rawTotalActive)}
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">{items.length} itens orçados</span>
+                </div>
+
+                <div className="bg-[#0b101d] border border-slate-800 rounded-xl p-4">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">2. BDI & Margem ({contingencyPercent}%)</span>
+                  <div className="text-lg font-black text-amber-400 font-mono mt-1">
+                    {formatCurrencyBR(contingencyValue)}
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">Reserva técnica</span>
+                </div>
+
+                <div className="bg-[#0b101d] border border-slate-800 rounded-xl p-4">
+                  <span className="text-[10px] font-mono uppercase text-slate-400 font-bold block">3. Mão de Obra</span>
+                  <div className="text-lg font-black text-sky-400 font-mono mt-1">
+                    {formatCurrencyBR(laborBudget)}
+                  </div>
+                  <span className="text-[11px] text-slate-500 mt-0.5 block">Equipe especializada</span>
+                </div>
+
+                <div className="bg-gradient-to-br from-emerald-950/40 to-[#0b101d] border border-emerald-500/40 rounded-xl p-4 shadow-sm">
+                  <span className="text-[10px] font-mono uppercase text-emerald-400 font-extrabold block">4. Valor Total Proposta</span>
+                  <div className="text-xl font-black text-emerald-300 font-mono mt-1">
+                    {formatCurrencyBR(globalProjectBudget)}
+                  </div>
+                  <span className="text-[11px] text-emerald-400/80 font-mono mt-0.5 block">
+                    R$ {(globalProjectBudget / (project.areaTotalM2 || 1)).toFixed(2)}/m²
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : (
+          /* =========================================================================
+             VISÃO 3: ORÇAMENTO WBS (Visão Hierárquica em Árvore Analítica / Accordion)
+             ========================================================================= */
+          <div className="flex-1 overflow-y-auto overflow-x-auto">
+            <table className="w-full text-left border-collapse min-w-[1050px]">
+              {/* Header Corporativo (Inspirado no Sienge / Mais Controle) */}
+              <thead className="bg-[#0b101c] text-slate-300 border-b border-slate-800 text-[11px] font-mono uppercase tracking-wider sticky top-0 z-10 select-none shadow-sm">
               <tr>
                 <th className="py-2.5 px-3 w-16 text-center">Item</th>
                 <th className="py-2.5 px-3">Descrição do Insumo / Composição</th>
@@ -969,6 +1304,7 @@ export const BudgetScreen: React.FC<BudgetScreenProps> = ({
             </tbody>
           </table>
         </div>
+      )}
 
         {/* PAINEL INSPETOR LATERAL (Slide-over da Opção 2) */}
         {selectedInspectorItem && (
