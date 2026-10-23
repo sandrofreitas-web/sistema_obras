@@ -384,26 +384,69 @@ export const InvoiceIngestionModal: React.FC<InvoiceIngestionModalProps> = ({
     const updatedProject = storageService.addRealPurchase(activeProject.id, novaCompra);
 
     if (updatedProject) {
-      // Marca os itens da WBS vinculados como comprados
-      const matchedIds = new Set(
-        extractedData.itens
-          .map((it) => it.itemProjetoIdSugerido)
-          .filter((id): id is string => Boolean(id))
-      );
+      // Mapa dos itens faturados que foram vinculados a itens existentes na WBS
+      const matchedMap = new Map<string, ItemNotaFiscalExtraido>();
+      extractedData.itens.forEach((it) => {
+        if (it.itemProjetoIdSugerido) {
+          matchedMap.set(it.itemProjetoIdSugerido, it);
+        }
+      });
 
-      if (matchedIds.size > 0) {
-        const updatedCenarios = updatedProject.cenarios.map((cen) => ({
-          ...cen,
-          itens: cen.itens.map((it) =>
-            matchedIds.has(it.id) ? { ...it, comprado: true } : it
-          ),
+      // Atualiza os cenários do projeto com conciliação automática
+      const updatedCenarios = updatedProject.cenarios.map((cen) => {
+        const itensAtualizados = cen.itens.map((it) => {
+          const nfItem = matchedMap.get(it.id);
+          if (nfItem) {
+            // Item da WBS que foi faturado: concilia e substitui com os dados reais da compra
+            return {
+              ...it,
+              comprado: true,
+              lojaReferencia: extractedData.fornecedorNome || it.lojaReferencia,
+              precoUnitario: nfItem.valorUnitario > 0 ? nfItem.valorUnitario : it.precoUnitario,
+              precoTotal: nfItem.valorTotal > 0 ? nfItem.valorTotal : it.precoTotal,
+              quantidadeComPerda: nfItem.quantidade > 0 ? nfItem.quantidade : it.quantidadeComPerda,
+              observacoes: `Comprado via NF ${extractedData.numeroNf || 'S/N'} (${extractedData.fornecedorNome}). ${it.observacoes || ''}`.trim(),
+            };
+          }
+          return it;
+        });
+
+        // Para os itens da nota que NÃO foram vinculados a nenhum item da WBS, adiciona como novos materiais faturados
+        const unlinkedNfItems = extractedData.itens.filter((it) => !it.itemProjetoIdSugerido);
+        const novosItensWbs: ItemProjeto[] = unlinkedNfItems.map((it, idx) => ({
+          id: `item-nf-${Date.now()}-${idx}`,
+          ambienteId: cen.itens[0]?.ambienteId || 'amb-pastoral',
+          cenarioId: cen.id,
+          materialId: `mat-nf-${Date.now()}-${idx}`,
+          materialNome: it.descricao,
+          fabricante: extractedData.fornecedorNome,
+          classe: (it.categoriaSugerida as any) || 'Bruto / Estrutura',
+          categoria: it.categoriaSugerida || 'Básicos de Obra',
+          tipo: it.descricao,
+          unidade: it.unidade || 'un',
+          quantidadeBase: it.quantidade,
+          perdaTecnicaPercent: 0,
+          quantidadeComPerda: it.quantidade,
+          precoUnitario: it.valorUnitario,
+          precoTotal: it.valorTotal,
+          lojaReferencia: extractedData.fornecedorNome,
+          observacoes: `NF ${extractedData.numeroNf || 'S/N'} (${extractedData.fornecedorNome}).`,
+          comprado: true,
         }));
-        const finalProject = { ...updatedProject, cenarios: updatedCenarios };
-        storageService.saveProject(finalProject);
-        onProjectUpdated(finalProject);
-      } else {
-        onProjectUpdated(updatedProject);
-      }
+
+        const totalItens = [...itensAtualizados, ...novosItensWbs];
+        const novoTotalEstimado = totalItens.reduce((sum, item) => sum + (item.precoTotal || 0), 0);
+
+        return {
+          ...cen,
+          itens: totalItens,
+          totalEstimado: novoTotalEstimado,
+        };
+      });
+
+      const finalProject = { ...updatedProject, cenarios: updatedCenarios };
+      storageService.saveProject(finalProject);
+      onProjectUpdated(finalProject);
     }
 
     handleReset();

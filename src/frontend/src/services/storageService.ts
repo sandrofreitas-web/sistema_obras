@@ -283,9 +283,16 @@ export const storageService = {
             mergedItens.push(...newItens);
           }
 
+          // Expurgar itens da WBS que foram substituídos por compras reais em outros fornecedores (evita duplicidades)
+          const supersededItemIds = new Set(['item-pas-12']);
+          const finalItens = mergedItens.filter((it) => !supersededItemIds.has(it.id));
+          if (finalItens.length !== mergedItens.length) {
+            itensChanged = true;
+          }
+
           if (itensChanged) {
             projUpdated = true;
-            const updatedTotal = mergedItens.reduce(
+            const updatedTotal = finalItens.reduce(
               (sum, it) => sum + (it.precoTotal || 0),
               0
             );
@@ -293,7 +300,7 @@ export const storageService = {
               (c.id === initialCenario.id || idx === 0)
                 ? {
                     ...c,
-                    itens: mergedItens,
+                    itens: finalItens,
                     totalEstimado: updatedTotal,
                   }
                 : c
